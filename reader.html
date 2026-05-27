@@ -1,0 +1,1843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IELTS Reader</title>
+<style>
+:root {
+  --bg: #fafaf8;
+  --text: #1a1a1a;
+  --muted: #666;
+  --border: #e0e0e0;
+  --accent: #2b5797;
+  --accent-light: #e8f0fe;
+  --red: #d1453b;
+  --yellow: #e8a317;
+  --vocab-red-bg: #fca5a5;
+  --vocab-yellow-bg: #fde68a;
+  --panel-bg: #ffffff;
+  --hover-bg: #f0f4fa;
+  --syn-s: #dce6f5;   --syn-s-ul: #4b6fa0;
+  --syn-v: #fde8d0;  --syn-v-ul: #c0843a;
+  --syn-o: #e8d0f5;  --syn-o-ul: #7e5095;
+  --syn-p: #f5e0d0;  --syn-p-ul: #b88a5e;
+  --syn-dc: #d0f0e8; --syn-dc-ul: #4a8c7a;
+  --syn-ac: #f5d0e0; --syn-ac-ul: #b85570;
+  --syn-sc: #d0d8f5; --syn-sc-ul: #5565a2;
+  --syn-ap: #f0e8d0; --syn-ap-ul: #a8953e;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+
+/* Layout */
+.container { display: flex; max-width: 1400px; margin: 0 auto; min-height: 100vh; }
+.left-panel { flex: 2; padding: 40px 50px 80px; max-width: 900px; overflow-y: auto; transition: all 0.2s; }
+.right-panel { flex: 1; min-width: 340px; max-width: 420px; background: var(--panel-bg); border-left: 1px solid var(--border); padding: 30px 28px; position: sticky; top: 0; height: 100vh; overflow-y: auto; transition: all 0.2s; }
+.right-panel.collapsed { flex: 0; min-width: 0; max-width: 0; padding: 0; overflow: hidden; border-left: none; }
+.left-panel.full { flex: 1; max-width: 800px; margin: 0 auto; }
+/* Panel toggle */
+.panel-toggle { display: flex; align-items: center; justify-content: center; width: 20px; cursor: pointer; background: var(--panel-bg); border-left: 1px solid var(--border); color: #bbb; font-size: 12px; user-select: none; flex-shrink: 0; }
+.panel-toggle:hover { background: var(--hover-bg); color: var(--accent); }
+.panel-toggle.collapsed { border-left: none; border-right: 1px solid var(--border); }
+
+/* Header */
+.header { margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid var(--border); }
+.header h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }
+.header .meta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.header .meta span { margin-right: 16px; }
+.header .header-actions { display: inline-flex; gap: 6px; margin-left: 12px; }
+.header .header-actions span { font-size: 12px; cursor: pointer; color: var(--accent); text-decoration: underline; }
+
+/* Article */
+.article { font-size: 16px; }
+.article p { margin-bottom: 1.2em; text-align: justify; position: relative; }
+
+/* Paragraph marker */
+.para-marker { font-size: 11px; color: #999; cursor: pointer; vertical-align: super; user-select: none; margin-right: 2px; }
+.para-marker:hover { color: var(--accent); }
+
+/* Sentence marker */
+.sent-marker { font-size: 10px; color: #bbb; cursor: pointer; vertical-align: super; user-select: none; margin: 0 2px; }
+.sent-marker:hover { color: var(--accent); }
+.sent-marker.has-notes { color: var(--accent); font-weight: 700; font-size: 11px; }
+
+/* Word clickable */
+.sentence { cursor: default; transition: background 0.15s; border-radius: 2px; padding: 1px 0; }
+.sentence.highlight { background: #dce6f5 !important; }
+.word-clickable { cursor: pointer; border-radius: 1px; padding: 0 1px; position: relative; }
+
+/* Vocab — background highlight */
+.word-clickable.vocab-red { background: var(--vocab-red-bg); }
+.word-clickable.vocab-yellow { background: var(--vocab-yellow-bg); }
+
+/* Syntax — underline */
+.syn-group.syn-s { text-decoration: underline; text-decoration-color: var(--syn-s-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+.syn-group.syn-v { text-decoration: underline; text-decoration-color: var(--syn-v-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+.syn-group.syn-o { text-decoration: underline; text-decoration-color: var(--syn-o-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+.syn-group.syn-p { text-decoration: underline; text-decoration-color: var(--syn-p-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+.syn-group.syn-dc { text-decoration: underline; text-decoration-color: var(--syn-dc-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+.syn-group.syn-ac { text-decoration: underline; text-decoration-color: var(--syn-ac-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+.syn-group.syn-sc { text-decoration: underline; text-decoration-color: var(--syn-sc-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+.syn-group.syn-ap { text-decoration: underline; text-decoration-color: var(--syn-ap-ul); text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-skip-ink: none; }
+
+/* Inline sentence card */
+.sentence-card { margin: 10px 0 14px 12px; padding: 16px 18px; background: #fdfdfc; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; font-size: 14px; }
+.sentence-card .card-sentence { font-size: 15px; line-height: 1.7; margin-bottom: 12px; padding: 8px 0; user-select: text; }
+.sentence-card .card-sentence .word-clickable { cursor: pointer; }
+.sentence-card .card-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.sentence-card .card-notes { width: 100%; min-height: 80px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: Arial, sans-serif; line-height: 1.6; resize: vertical; outline: none; transition: border-color 0.15s; margin-bottom: 8px; }
+.sentence-card .card-notes:focus { border-color: var(--accent); }
+.sentence-card .card-actions { display: flex; gap: 6px; align-items: center; }
+.sentence-card .card-actions button { font-size: 12px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.sentence-card .card-actions button:hover { background: var(--accent-light); }
+.sentence-card .card-actions button.collected { background: #fef5e0; border-color: #f0d78c; color: #b8860b; }
+.card-saved-hint { font-size: 11px; color: var(--accent); opacity: 0; transition: opacity 0.3s; margin-left: 8px; }
+.card-saved-hint.show { opacity: 1; }
+
+/* Right panel */
+.right-panel h3 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.panel-tabs { display: flex; gap: 0; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.panel-tabs button { flex: 1; padding: 8px 0; border: none; background: #f5f5f3; font-size: 12px; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+.panel-tabs button.active { background: var(--accent); color: white; }
+.panel-tabs button:not(:last-child) { border-right: 1px solid var(--border); }
+
+/* Vocabulary list */
+.vocab-list-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; cursor: pointer; }
+.vocab-list-item:hover { background: #f8f8f6; }
+.vocab-list-item .level-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.vocab-list-item .word { font-weight: 700; }
+.vocab-list-item .context { font-size: 12px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.level-dot.red { background: var(--red); }
+.level-dot.yellow { background: var(--yellow); }
+.vocab-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 24px 0; }
+
+/* Vocab popup */
+.vocab-popup { position: fixed; background: white; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; display: none; padding: 8px 10px; min-width: 280px; }
+.vocab-popup .popup-section { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
+.vocab-popup .popup-section + .popup-section { border-top: 1px solid #eee; }
+.vocab-popup .popup-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; white-space: nowrap; }
+.vocab-popup .color-btn { width: 30px; height: 30px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: all 0.15s; }
+.vocab-popup .color-btn:hover { transform: scale(1.15); border-color: #999; }
+.vocab-popup .color-btn.active { border-color: #333; box-shadow: 0 0 0 1px #333; }
+.vocab-popup .color-btn.red { background: var(--red); }
+.vocab-popup .color-btn.yellow { background: var(--yellow); }
+.vocab-popup .color-btn.remove { background: #eee; font-size: 12px; line-height: 28px; text-align: center; color: #999; width: auto; padding: 0 8px; }
+.vocab-popup .syn-btn { width: 28px; height: 28px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.15s; font-family: inherit; }
+.vocab-popup .syn-btn:hover { transform: scale(1.15); border-color: #999; }
+.vocab-popup .syn-btn.active { border-color: #333; box-shadow: 0 0 0 1px #333; }
+.vocab-popup .syn-btn.syn-s { background: var(--syn-s); }
+.vocab-popup .syn-btn.syn-v { background: var(--syn-v); }
+.vocab-popup .syn-btn.syn-o { background: var(--syn-o); }
+.vocab-popup .syn-btn.syn-p { background: var(--syn-p); }
+.vocab-popup .syn-btn.syn-dc { background: var(--syn-dc); }
+.vocab-popup .syn-btn.syn-ac { background: var(--syn-ac); }
+.vocab-popup .syn-btn.syn-sc { background: var(--syn-sc); }
+.vocab-popup .syn-btn.syn-ap { background: var(--syn-ap); }
+.vocab-popup .multi-toggle { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 8px; background: white; font-family: inherit; margin-left: auto; white-space: nowrap; }
+.vocab-popup .hint-input { display: block !important; width: 100% !important; max-width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; font-family: inherit; outline: none; margin-top: 2px; box-sizing: border-box; resize: none; overflow: hidden; min-height: 28px; line-height: 1.5; }
+.vocab-popup .hint-input:focus { border-color: var(--accent); }
+.vocab-popup .hint-row { display: block !important; }
+
+/* Phrase groups */
+.phrase-group { padding-bottom: 1px; border-radius: 2px; }
+.phrase-group.phrase-red { background: var(--vocab-red-bg); border-bottom: 3px solid var(--red); }
+.phrase-group.phrase-yellow { background: var(--vocab-yellow-bg); border-bottom: 3px solid var(--yellow); }
+.phrase-bracket { font-weight: 700; user-select: none; }
+.phrase-red .phrase-bracket { color: var(--red); }
+.phrase-yellow .phrase-bracket { color: var(--yellow); }
+.vocab-popup .multi-toggle.on { background: var(--accent); color: white; }
+
+/* Range selection */
+.word-clickable.range-start { outline: 2px dashed var(--accent); outline-offset: 1px; border-radius: 2px; }
+.word-clickable.range-selected { background: #dce6f5 !important; border-radius: 2px; }
+
+/* Sentence list */
+.sentence-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; cursor: pointer; }
+.sentence-item:hover { background: #f8f8f6; }
+.sentence-item .s-text { line-height: 1.6; margin-bottom: 4px; }
+.sentence-item .s-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.sentence-item .s-meta .tag { padding: 1px 8px; background: #f0f0f0; border-radius: 10px; font-size: 11px; }
+
+/* Data controls */
+.data-controls { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap; }
+.data-controls button { font-size: 12px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: pointer; font-family: inherit; }
+.data-controls button:hover { background: #f0f0f0; }
+
+/* Inline edit */
+.inline-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: Arial, sans-serif; outline: none; transition: border-color 0.15s; }
+.inline-input:focus { border-color: var(--accent); }
+.edit-textarea { width: 100%; min-height: 400px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; font-family: Arial, sans-serif; line-height: 1.7; resize: vertical; outline: none; transition: border-color 0.15s; }
+.edit-textarea:focus { border-color: var(--accent); }
+.edit-toolbar { display: flex; gap: 8px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* Modals */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+.modal { background: white; border-radius: 12px; width: 580px; max-width: 90vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+.modal-wider { width: 700px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+.modal-header h3 { font-size: 16px; font-weight: 700; color: var(--accent); text-transform: none; letter-spacing: 0; border: none; margin: 0; padding: 0; }
+.modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #999; padding: 4px 8px; border-radius: 4px; }
+.modal-close:hover { background: #f0f0f0; }
+.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.modal-section { margin-bottom: 16px; }
+.modal-section label { font-size: 13px; font-weight: 700; display: block; margin-bottom: 6px; color: var(--text); }
+.modal-section .hint { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.modal-input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+.modal-input:focus { border-color: var(--accent); }
+.modal-textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: Arial, sans-serif; line-height: 1.6; resize: vertical; outline: none; transition: border-color 0.15s; min-height: 200px; }
+.modal-textarea:focus { border-color: var(--accent); }
+.modal-textarea-sm { min-height: 100px; }
+.modal-sentence { font-size: 14px; line-height: 1.7; padding: 12px; background: var(--accent-light); border-radius: 6px; color: var(--text); }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-list .tag { padding: 4px 12px; border: 1px solid var(--border); border-radius: 14px; font-size: 12px; cursor: pointer; transition: all 0.15s; background: white; user-select: none; }
+.tag-list .tag.selected { background: var(--accent); color: white; border-color: var(--accent); }
+.modal-error { font-size: 13px; color: var(--red); min-height: 20px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); }
+.btn-primary { background: var(--accent); color: white; border: none; padding: 8px 24px; border-radius: 6px; font-size: 14px; cursor: pointer; font-family: inherit; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-secondary { background: #f0f0f0; color: var(--text); border: none; padding: 8px 24px; border-radius: 6px; font-size: 14px; cursor: pointer; font-family: inherit; }
+.btn-secondary:hover { background: #e0e0e0; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .container { flex-direction: column; }
+  .left-panel { padding: 24px 20px 60px; max-width: 100%; }
+  .right-panel { position: static; height: auto; max-width: 100%; border-left: none; border-top: 1px solid var(--border); padding: 20px; }
+  .panel-toggle { display: none; }
+}
+
+/* Print — clean article only */
+@media print {
+  .right-panel, .header-actions, .sent-marker, .vocab-popup,
+  .modal-overlay, #inlineEdit, #pasteZone, .data-controls,
+  .sentence-card, .phrase-bracket { display: none !important; }
+  .left-panel { max-width: 100%; padding: 0; }
+  .article { font-size: 16px; line-height: 1.6; }
+  .word-clickable { cursor: text; }
+  .word-clickable.vocab-red, .word-clickable.vocab-yellow,
+  .phrase-group.phrase-red, .phrase-group.phrase-yellow { background: none !important; border-bottom: none !important; }
+  .syn-group { text-decoration: none !important; }
+  @page { margin: 2cm; }
+}
+
+/* Empty state */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-state p { font-size: 14px; margin-top: 8px; }
+
+/* Dashboard */
+.dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; padding-bottom: 16px; border-bottom: 2px solid var(--border); }
+.dash-header h1 { font-size: 20px; font-weight: 700; color: var(--accent); }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.dash-card { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; cursor: pointer; transition: all 0.15s; }
+.dash-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(43,87,151,0.12); transform: translateY(-1px); }
+.dash-card .dash-source { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+.dash-card .dash-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; line-height: 1.4; }
+.dash-card .dash-meta { font-size: 11px; color: var(--muted); }
+.dash-card .dash-delete { float: right; font-size: 16px; color: #ccc; cursor: pointer; padding: 0 4px; }
+.dash-card .dash-delete:hover { color: var(--red); }
+
+/* Review tab */
+.review-card { padding: 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; }
+.review-sentence { font-size: 15px; line-height: 1.8; padding: 14px 18px; background: var(--accent-light); border-radius: 6px; margin-bottom: 16px; word-break: break-word; }
+.review-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.review-input { flex: 1; padding: 8px 12px; border: 2px solid var(--border); border-radius: 6px; font-size: 15px; font-family: inherit; outline: none; }
+.review-input:focus { border-color: var(--accent); }
+.review-feedback { margin-top: 8px; font-size: 14px; min-height: 36px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.review-correct { color: #2e7d32; font-weight: 700; }
+.review-incorrect { color: var(--red); font-weight: 700; }
+.review-hint { margin-top: 8px; padding: 10px 14px; background: #fef9e7; border-radius: 6px; font-size: 13px; line-height: 1.7; }
+.review-hint .hint-chinese { margin-bottom: 4px; color: var(--text); }
+.review-hint .hint-first { color: var(--muted); font-size: 15px; font-weight: 700; letter-spacing: 2px; }
+.review-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
+.review-progress { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.review-progress .bar { flex: 1; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
+.review-progress .bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; width: 0; }
+/* Review expanded overlay */
+.review-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.35); z-index: 3000; display: flex; align-items: center; justify-content: center; }
+.review-overlay .review-card { width: 640px; max-width: 90vw; padding: 32px 36px; background: white; border-radius: 14px; box-shadow: 0 8px 40px rgba(0,0,0,0.18); max-height: 85vh; overflow-y: auto; }
+.review-overlay .review-sentence { font-size: 18px; padding: 20px 24px; }
+.review-overlay .review-input { font-size: 18px; padding: 12px 16px; }
+.review-overlay .review-feedback { font-size: 16px; }
+.review-overlay .review-hint { font-size: 15px; }
+.review-size-btn { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 10px; background: white; font-family: inherit; margin-left: 8px; }
+.review-size-btn:hover { background: var(--accent-light); }
+#reviewSizeBtn { float: right; }
+</style>
+<script src="seed_t1.js"></script>
+<script src="seed_t2.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <!-- LEFT: ARTICLE -->
+  <div class="left-panel" id="leftPanel">
+    <div class="header" id="articleHeader" style="display:none;">
+      <h1><span id="articleTitle"></span>
+        <span class="header-actions">
+          <span onclick="showDashboard()">所有文章</span>
+          <span onclick="showPasteZone()">换文章</span>
+          <span onclick="showEditModal()">编辑文章</span>
+          <span onclick="window.print()">打印原文</span>
+        </span>
+      </h1>
+      <div class="meta">
+        <span id="articleSource"></span>
+        <span id="articleMeta"></span>
+      </div>
+    </div>
+    <!-- Dashboard -->
+    <div id="dashboard" style="display:none;"></div>
+    <div class="article" id="articleContainer"></div>
+    <!-- Inline paste zone -->
+    <div id="pasteZone" style="display:none;">
+      <input class="inline-input" id="pasteTitle" placeholder="文章标题" style="font-size:18px;font-weight:700;width:100%;margin-bottom:8px;">
+      <input class="inline-input" id="pasteSource" placeholder="来源，如：IELTS-11-T1" style="font-size:13px;color:var(--muted);width:100%;margin-bottom:12px;">
+      <textarea class="edit-textarea" id="pasteText" placeholder="从雅思哥粘贴文章到这里…&#10;按空行自动分段" style="min-height:300px;"></textarea>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn-secondary" onclick="cancelPaste()">取消</button>
+        <button class="btn-primary" onclick="quickImport()">开始学习</button>
+      </div>
+    </div>
+    <div id="inlineEdit" style="display:none;">
+      <div style="margin-bottom:12px;">
+        <input class="inline-input" id="inlineTitle" placeholder="文章标题" style="font-size:18px;font-weight:700;width:100%;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <input class="inline-input" id="inlineSource" placeholder="来源代号" style="font-size:13px;color:var(--muted);width:100%;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <textarea class="edit-textarea" id="inlineText" placeholder="每段之间用空行分隔"></textarea>
+      </div>
+      <div class="edit-toolbar">
+        <button class="btn-secondary" onclick="autoCorrect()">🔍 自动校对</button>
+        <span style="flex:1;"></span>
+        <button class="btn-secondary" onclick="cancelInlineEdit()">取消</button>
+        <button class="btn-primary" onclick="saveInlineEdit()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel toggle -->
+  <div class="panel-toggle" id="panelToggle" onclick="togglePanel()" title="折叠/展开侧栏">◀</div>
+
+  <!-- RIGHT: VOCAB + SENTENCES -->
+  <div class="right-panel" id="rightPanel">
+    <div class="panel-tabs">
+      <button class="active" data-tab="vocab">Vocab</button>
+      <button data-tab="sentences">Sentences</button>
+      <button data-tab="review">Review</button>
+    </div>
+
+    <!-- Tab: Vocabulary -->
+    <div id="tab-vocab" class="tab-content">
+      <h3>Marked Vocabulary</h3>
+      <div id="vocab-filter" style="margin-bottom:12px;display:flex;gap:4px;">
+        <button class="filter-btn active" data-filter="all" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;background:var(--accent);color:white;font-family:inherit;">All</button>
+        <button class="filter-btn" data-filter="red" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;background:white;font-family:inherit;">🔴</button>
+        <button class="filter-btn" data-filter="yellow" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;background:white;font-family:inherit;">🟡</button>
+      </div>
+      <div id="vocab-list"><div class="vocab-empty">No vocabulary marked yet.</div></div>
+    </div>
+
+    <!-- Tab: Sentences -->
+    <div id="tab-sentences" class="tab-content" style="display:none;">
+      <h3>Collected Sentences</h3>
+      <div id="sentences-list"><div class="vocab-empty">No sentences collected yet.</div></div>
+    </div>
+
+    <!-- Tab: Review -->
+    <div id="tab-review" class="tab-content" style="display:none;">
+      <h3>SRS Review</h3>
+      <div class="review-progress" id="reviewProgress">
+        <span id="reviewLabel">0 / 0</span>
+        <div class="bar"><div class="bar-fill" id="reviewBarFill"></div></div>
+      </div>
+      <div id="reviewCard"><div class="review-empty">Switch to Review tab to start.</div></div>
+    </div>
+
+    <!-- Data controls -->
+    <div class="data-controls">
+      <button onclick="exportObsidian()">📥 Export .md</button>
+      <button onclick="exportJson()">📥 Export JSON</button>
+      <button onclick="exportSnapshot()">📱 Snapshot</button>
+      <button onclick="document.getElementById('importFile').click()">📤 Import JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJson(event)">
+      <button onclick="if(confirm('Clear all data?')){clearAllData()}">🗑 Clear</button>
+      <button onclick="copyVocabList()">📋 复制单词</button>
+    </div>
+  </div>
+</div>
+
+<!-- Vocab popup -->
+<div class="vocab-popup" id="vocabPopup">
+  <div class="popup-section" id="vocabColors"></div>
+  <div class="popup-section hint-row" id="vocabHintRow" style="display:none;"></div>
+  <div class="popup-section" id="vocabSynRow"></div>
+</div>
+
+<!-- Sentence Collect Modal -->
+<div class="modal-overlay" id="sentenceModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Collect Sentence</h3>
+      <button class="modal-close" onclick="closeSentenceModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <label>Sentence</label>
+        <div class="modal-sentence" id="modalSentenceText"></div>
+      </div>
+      <div class="modal-section">
+        <label>Tags <span class="hint">click to toggle</span></label>
+        <div class="tag-list" id="modalTags"></div>
+      </div>
+      <div class="modal-section">
+        <label>Imitation <span class="hint">keep structure, change topic</span></label>
+        <textarea class="modal-textarea modal-textarea-sm" id="modalImitation" placeholder="Write your imitation..."></textarea>
+      </div>
+      <div class="modal-section">
+        <label>Paraphrase <span class="hint">same meaning, different structure</span></label>
+        <textarea class="modal-textarea modal-textarea-sm" id="modalParaphrase" placeholder="Write your paraphrase..."></textarea>
+      </div>
+      <div class="modal-error" id="modalError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeSentenceModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveSentence()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SENTENCE SPLITTER
+// ============================================================
+function splitSentences(text) {
+  const abbrevs = ['Mr.','Mrs.','Dr.','Prof.','vs.','e.g.','i.e.','etc.','No.','St.','Ave.','dept.'];
+  let clean = text;
+  abbrevs.forEach(a => { clean = clean.replace(new RegExp(a.replace('.','\\.'),'g'), a.replace('.','<ABBR>')); });
+  // Protect decimal numbers (e.g. 1.5 → 1<DOT>5) so they don't split
+  clean = clean.replace(/(\d)\.(\d)/g, '$1<DOT>$2');
+  const parts = clean.match(/[^.!?]+[.!?]+/g) || [clean];
+  return parts.map(s => s.replace(/<ABBR>/g,'.').replace(/<DOT>/g, '.')).map(s => s.trim()).filter(s => s.length > 0);
+}
+
+function toRoman(n) {
+  const vals = [[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let r = '';
+  for (const [v,s] of vals) { while (n >= v) { r+=s; n-=v; } }
+  return r;
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let articleData = null;
+let vocabData = [];
+let sentenceData = [];
+let syntaxData = [];
+let sentenceNotes = {};   // { sentId: "user's note text" }
+let currentWord = null;
+let selectedSentId = null;
+let currentCollectSent = null;
+let currentSyntaxSelection = null;
+let multiWordMode = false;
+let multiWordStart = null;
+let lastSentText = '';
+
+const FUNC_TAGS = ['开头句','结尾句','主题句','例证句','过渡句','对比句','因果句','让步句'];
+const STRUCT_TAGS = ['简单句','并列句','复合句','并列复合句','倒装句','强调句','虚拟语气','被动语态'];
+const TOPIC_TAGS = ['科学','历史','社会','教育','环境','健康','技术','经济'];
+
+const SYNTAX_TYPES = [
+  { id:'s',  label:'S',  name:'主语', color:'var(--syn-s)' },
+  { id:'v',  label:'V',  name:'谓语', color:'var(--syn-v)' },
+  { id:'o',  label:'O',  name:'宾语', color:'var(--syn-o)' },
+  { id:'p',  label:'P',  name:'表语', color:'var(--syn-p)' },
+  { id:'dc', label:'定从', name:'定语从句', color:'var(--syn-dc)' },
+  { id:'ac', label:'状从', name:'状语从句', color:'var(--syn-ac)' },
+  { id:'sc', label:'主从', name:'主语从句', color:'var(--syn-sc)' },
+  { id:'ap', label:'同从', name:'同位语从句', color:'var(--syn-ap)' },
+];
+
+// Common English words for auto-correct segmentation
+const WORD_DICT = new Set([
+  'a','i','in','on','at','to','of','is','it','be','we','he','an','so','go','no','up','if','or','by','my','me','do','as','us','am','oh','ah','hi','ha','ad','ah','el','em',
+  'the','and','for','are','but','not','you','all','can','had','her','was','one','our','out','has','his','its','may','who','how','now','new','any','see','get','use','way','day','man','say','she','too','two','let','few','big','own','old','end','try','ask','off','put','yet','ago','run',
+  'that','with','have','this','will','your','from','they','been','when','make','like','just','some','what','than','then','them','also','more','which','their','there','after','could','other','these','first','thing','about','would','think','where','those','being','under','never','world','while','still','great','every','found','place','again','right','small','large','house','point','group','number','people','water','study','should','during','system','social','problem','research','school','between','country','however','company','program','provide','include','through','example','another','because','process','against','already','without','several','service','important','different','information','government',
+  'about','above','across','after','again','against','almost','among','animal','around','asked','became','become','before','behind','being','believe','better','beyond','brought','called','caused','change','children','coming','common','control','country','created','culture','decided','developed','during','earlier','economic','education','either','energy','english','enough','environment','especially','established','europe','evidence','example','experience','factors','family','father','figure','followed','foreign','further','general','getting','government','greater','ground','groups','growth','having','higher','history','however','human','including','increase','industry','instead','interest','involved','island','itself','knowledge','language','larger','leader','learning','levels','living','looking','machine','making','management','market','materials','meaning','members','methods','million','modern','moment','mother','movement','natural','needed','nothing','obtained','office','opening','opinion','orders','others','percent','period','plants','policy','political','population','position','possible','practice','present','president','pressure','problem','process','produced','product','program','project','provide','public','quality','question','reading','recent','records','reported','required','research','results','returns','running','science','section','seemed','service','several','showed','similar','society','sources','speech','started','stating','storage','studies','support','surface','systems','taking','technology','telling','thought','through','together','toward','turned','university','usually','various','village','wanting','western','whether','working','writing','written',
+  'today','tomorrow','yesterday','weather','whether','indoor','outdoor','window','garden','market','system','would','could','should','people','school','online','money','water','power','paper','music','movie','model','metal','media','legal','level','issue','horse','hotel','heart','happy','green','glass','fruit','floor','field','event','entry','error','email','drive','drama','doubt','draft','dirty','delta','daily','cycle','curve','crown','cream','craft','court','count','corner','cookie','coffee','close','click','claim','chest','check','chair','chain','catch','carry','candy','camel','cabin','brown','bread','brain','board','blood','block','birth','begin','beach','battle','basic','basis','asset','apple','angle','alone','allow','alert','agent','ahead','adopt','admit','actor','acute','abuse','above','round','sound','found','world','class','plant','piece','night','mouth','lunch','light','house','group','grass','grant','grade','force','frame','front','fresh','entry','enemy','dress','dream','draft','doubt','drink','drive','drama','drink','draft','dream','dress','doubt','drink','drive','drama','drift','droop','drone','drool','drape','drawl','dread','drape','drank','drama'
+]);
+
+// ============================================================
+// PERSISTENCE — Multi-article Store
+// ============================================================
+let currentArticleId = null;
+
+function getArticleIndex() {
+  return JSON.parse(localStorage.getItem('ielts_index') || '{}');
+}
+function saveArticleIndex(store) {
+  localStorage.setItem('ielts_index', JSON.stringify(store));
+}
+function getArticleStoreKey(id) {
+  return 'ielts_article_' + id;
+}
+
+function saveFullArticleData() {
+  if (!currentArticleId || !articleData) return;
+  const data = { article: articleData, vocab: vocabData, sentences: sentenceData, syntax: syntaxData, notes: sentenceNotes };
+  localStorage.setItem(getArticleStoreKey(currentArticleId), JSON.stringify(data));
+  const store = getArticleIndex();
+  if (store[currentArticleId]) {
+    store[currentArticleId].modified = todayStr();
+    store[currentArticleId].vocabCount = vocabData.length;
+    store[currentArticleId].sentCount = sentenceData.length;
+    saveArticleIndex(store);
+  }
+  localStorage.setItem('ielts_last_article', currentArticleId);
+}
+
+function loadArticleFromStore(id) {
+  try { return JSON.parse(localStorage.getItem(getArticleStoreKey(id))); } catch(e) { return null; }
+}
+
+// Legacy save wrappers — all route to multi-article store
+function saveVocab() { saveFullArticleData(); }
+function saveSentences() { saveFullArticleData(); }
+function saveSyntax() { saveFullArticleData(); }
+function saveNotes() { saveFullArticleData(); }
+function saveArticle() { saveFullArticleData(); }
+
+function loadAll() {
+  try {
+    // Migration from old single-article format
+    const oldArticle = localStorage.getItem('ielts_article');
+    if (oldArticle && !localStorage.getItem('ielts_index')) {
+      const article = JSON.parse(oldArticle);
+      const vocab = JSON.parse(localStorage.getItem('ielts_vocab') || '[]');
+      const sentences = JSON.parse(localStorage.getItem('ielts_sentences') || '[]');
+      const syntax = JSON.parse(localStorage.getItem('ielts_syntax') || '[]');
+      const notes = JSON.parse(localStorage.getItem('ielts_sentence_notes') || '{}');
+      const source = article.source || 'article-1';
+      const id = slugify(source) || 'article-1';
+      const store = {};
+      store[id] = { id, title: article.title, source: article.source || '', created: todayStr(), modified: todayStr(), vocabCount: vocab.length, sentCount: sentences.length };
+      saveArticleIndex(store);
+      localStorage.setItem(getArticleStoreKey(id), JSON.stringify({ article, vocab, sentences, syntax, notes }));
+      localStorage.setItem('ielts_last_article', id);
+      ['ielts_article','ielts_vocab','ielts_sentences','ielts_syntax','ielts_sentence_notes'].forEach(k => localStorage.removeItem(k));
+    }
+
+    // Load last opened article
+    const store = getArticleIndex();
+    const ids = Object.keys(store);
+    const lastId = localStorage.getItem('ielts_last_article');
+    if (lastId && store[lastId]) {
+      currentArticleId = lastId;
+      const data = loadArticleFromStore(lastId);
+      if (data) {
+        articleData = data.article;
+        vocabData = data.vocab || [];
+        vocabData.forEach(v => { if (v.sentId && !v.sentenceId) { v.sentenceId = v.sentId; delete v.sentId; } });
+        sentenceData = data.sentences || [];
+        syntaxData = data.syntax || [];
+        sentenceNotes = data.notes || {};
+        return;
+      }
+    }
+    // No valid article
+    articleData = null;
+    vocabData = []; sentenceData = []; syntaxData = []; sentenceNotes = {};
+  } catch(e) { console.error('loadAll error', e); }
+}
+
+// ============================================================
+// IMPORT / EDIT
+// ============================================================
+function showPasteZone() {
+  saveFullArticleData();
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('articleContainer').style.display = 'none';
+  document.getElementById('inlineEdit').style.display = 'none';
+  document.getElementById('pasteZone').style.display = 'block';
+  document.getElementById('pasteText').focus();
+}
+function cancelPaste() {
+  document.getElementById('pasteZone').style.display = 'none';
+  document.getElementById('pasteTitle').value = '';
+  document.getElementById('pasteSource').value = '';
+  document.getElementById('pasteText').value = '';
+  if (currentArticleId) {
+    document.getElementById('articleContainer').style.display = 'block';
+    document.getElementById('articleHeader').style.display = 'block';
+  } else {
+    showDashboard();
+  }
+}
+function showEditModal() {
+  // Inline edit: hide article, show edit area
+  if (!articleData) return;
+  document.getElementById('inlineTitle').value = articleData.title;
+  document.getElementById('inlineSource').value = articleData.source || '';
+  document.getElementById('inlineText').value = articleData.paragraphs.map(sents => sents.join(' ')).join('\n\n');
+  document.getElementById('articleContainer').style.display = 'none';
+  document.getElementById('inlineEdit').style.display = 'block';
+}
+function saveInlineEdit() {
+  const title = document.getElementById('inlineTitle').value.trim();
+  const source = document.getElementById('inlineSource').value.trim();
+  const text = document.getElementById('inlineText').value.trim();
+  if (!title || !text) { alert('标题和正文不能为空'); return; }
+  const paras = parseArticle(text);
+  if (!paras.length) { alert('无法识别段落'); return; }
+  articleData = { title, source, paragraphs: paras };
+  saveArticle();
+  document.getElementById('inlineEdit').style.display = 'none';
+  document.getElementById('articleContainer').style.display = 'block';
+  renderAll();
+}
+
+function cancelInlineEdit() {
+  document.getElementById('inlineEdit').style.display = 'none';
+  document.getElementById('articleContainer').style.display = 'block';
+}
+
+function quickImport() {
+  const text = document.getElementById('pasteText').value.trim();
+  if (!text) { alert('请粘贴文章内容'); return; }
+  const paras = parseArticle(text);
+  if (!paras.length) { alert('无法识别段落，请用空行分隔'); return; }
+  // Title: use user input, fallback to first sentence
+  let title = document.getElementById('pasteTitle').value.trim();
+  if (!title) {
+    const firstSent = paras[0]?.[0] || '';
+    title = firstSent.length > 50 ? firstSent.substring(0, 50) + '…' : firstSent;
+  }
+  let source = document.getElementById('pasteSource').value.trim();
+  if (!source) source = todayStr();
+  articleData = { title, source, paragraphs: paras };
+
+  // Create new store entry — unique ID with timestamp guard
+  const baseId = slugify(source || title || 'article') || 'article';
+  let id = baseId;
+  const store = getArticleIndex();
+  let counter = 1;
+  while (store[id]) { id = baseId + '-' + (counter++); }
+  store[id] = { id, title, source, created: todayStr(), modified: todayStr(), vocabCount: 0, sentCount: 0 };
+  saveArticleIndex(store);
+  currentArticleId = id;
+  saveFullArticleData();
+  localStorage.setItem('ielts_last_article', id);
+
+  document.getElementById('pasteZone').style.display = 'none';
+  // Reset paste zone fields for next time
+  document.getElementById('pasteTitle').value = '';
+  document.getElementById('pasteSource').value = '';
+  document.getElementById('pasteText').value = '';
+  renderAll();
+}
+
+function parseArticle(text) {
+  let paras = text.split(/\n\s*\n+/).filter(p => p.trim());
+  if (paras.length < 2) {
+    const alt = text.split(/\n+/).filter(p => p.trim());
+    if (alt.length > 1) paras = alt;
+  }
+  return paras.map(p => splitSentences(p.trim()));
+}
+
+// ============================================================
+// AUTO CORRECT
+// ============================================================
+function autoCorrect() {
+  const ta = document.getElementById('inlineText');
+  let t = ta.value;
+  const fixes = [];
+  let count = 0;
+
+  // 1. Fix zero→O letter confusion
+  t = t.replace(/\b0([a-z])/g, (m, c) => { fixes.push(`${m}→O${c}`); count++; return 'O' + c; });
+  t = t.replace(/([a-z])0/g, (m, c) => { fixes.push(`${m}→${c}O`); count++; return c + 'O'; });
+
+  // 2. Fix 1→l/i confusion
+  t = t.replace(/\b1([a-z]{2,})/g, (m, c) => { fixes.push(`${m}→l${c}`); count++; return 'l' + c; });
+
+  // 3. Fix rn→m
+  t = t.replace(/rn/g, (m) => { fixes.push('rn→m'); count++; return 'm'; });
+
+  // 4. Remove extra spaces inside words
+  t = t.replace(/\b([a-z]) ([a-z])\b/g, (m, a, b) => { fixes.push(`"${m}"→"${a}${b}"`); count++; return a + b; });
+
+  // 5. Fix full-width punctuation
+  const FW = '，。！？；：“”‘’（）';
+  const HW = ',.!?;:""\'\'()';
+  t = t.replace(/[，。！？；：“”‘’（）]/g, (m) => {
+    const idx = FW.indexOf(m);
+    if (idx >= 0) { fixes.push(`全角→半角: ${m}`); count++; return HW[idx]; }
+    return m;
+  });
+
+  // 6. Remove spaces before punctuation
+  t = t.replace(/\s+([,.!?;:])/g, (m, p) => { fixes.push(`space before ${p}`); count++; return p; });
+
+  // 7. Add space after period if missing
+  t = t.replace(/\.([A-Z])/g, (m, c) => { fixes.push(`.${c}→. ${c}`); count++; return '. ' + c; });
+
+  // 8. Remove double spaces
+  t = t.replace(/  +/g, (m) => { fixes.push('double space'); count++; return ' '; });
+
+  // 9. Split camelCase / PascalCase
+  t = t.replace(/([a-z])([A-Z])/g, (m, a, b) => { fixes.push(`${m} → ${a} ${b}`); count++; return a + ' ' + b; });
+
+  // 10. Segment concatenated words using dictionary (threshold: 7+ chars)
+  // Disabled — too aggressive on legitimate words like "upright"
+
+  ta.value = t;
+  const msg = count > 0 ? `已修正 ${count} 处问题。\n${fixes.slice(0,10).join('\n')}${fixes.length>10?'\n...':''}` : '未发现需修正的问题。';
+  alert(msg);
+}
+
+// ============================================================
+// RENDER ARTICLE
+// ============================================================
+function renderAll() {
+  const container = document.getElementById('articleContainer');
+  const header = document.getElementById('articleHeader');
+  if (!articleData) {
+    container.innerHTML = '<div class="empty-state"><p style="font-size:32px;margin-bottom:8px;">📖</p><p>还没有文章</p></div>';
+    header.style.display = 'none';
+    return;
+  }
+  header.style.display = 'block';
+  document.getElementById('articleTitle').textContent = articleData.title;
+  document.getElementById('articleSource').textContent = articleData.source || '';
+  const totalSents = articleData.paragraphs.reduce((s, p) => s + p.length, 0);
+  const totalWords = articleData.paragraphs.reduce((s, p) => s + p.join(' ').split(/\s+/).length, 0);
+  document.getElementById('articleMeta').textContent = `${totalSents} sentences · ~${totalWords} words`;
+  renderArticle(); renderVocab(); renderSentences();
+}
+
+function renderArticle() {
+  const container = document.getElementById('articleContainer');
+  container.innerHTML = '';
+  let sentCount = 0;
+
+  articleData.paragraphs.forEach((sents, pIdx) => {
+    const pEl = document.createElement('p');
+    const paraNum = pIdx + 1;
+
+    sents.forEach(sentText => {
+      sentCount++;
+      const sentId = `p${paraNum}-s${sentCount}`;
+      const sentSpan = document.createElement('span');
+      sentSpan.className = 'sentence';
+      sentSpan.dataset.sentId = sentId;
+      sentSpan.dataset.para = paraNum;
+      sentSpan.dataset.sent = sentCount;
+
+      const parts = sentText.split(/(\s+)/);
+      let wordIdx = 0;
+      const items = parts.map(part => {
+        if (part.trim() === '') return { type: 'space', text: part };
+        const clean = part.replace(/[^a-zA-Z]/g,'').toLowerCase();
+        if (!clean.length) return { type: 'punct', text: part };
+        const vm = vocabData.find(v => !v.wordIndices && v.wordLower === clean && v.sentenceId === sentId);
+        const pm = vocabData.find(v => v.wordIndices && v.wordIndices.length > 1 && v.sentenceId === sentId && v.wordIndices.includes(wordIdx));
+        const sm = syntaxData.filter(s => s.sentId === sentId && s.wordIndices.includes(wordIdx));
+        const item = { type: 'word', text: part, clean, idx: wordIdx, synType: sm.length ? sm[0].type : null, vocabLevel: vm ? vm.level : null, phraseLevel: pm ? pm.level : null, phraseKey: pm ? pm.wordLower + '|' + pm.sentenceId : null };
+        wordIdx++;
+        return item;
+      });
+
+      const makeWordSpan = (item, inPhrase) => {
+        const ws = document.createElement('span');
+        ws.className = 'word-clickable';
+        ws.dataset.w = item.idx;
+        ws.dataset.clean = item.clean;
+        ws.dataset.sentId = sentId;
+        ws.dataset.word = item.text;
+        ws.textContent = item.text;
+        if (!inPhrase && item.vocabLevel) ws.classList.add('vocab-' + item.vocabLevel);
+        ws.addEventListener('click', (e) => { e.stopPropagation(); handleWordClick(ws, sentId, sentText, item.clean, item.text, e); });
+        return ws;
+      };
+
+      // Group contiguous same-type (phrase → syntax → plain word)
+      let i = 0;
+      while (i < items.length) {
+        const item = items[i];
+        if (item.type === 'word' && item.phraseKey) {
+          // Group contiguous same-phrase words
+          let end = i;
+          for (let j = i + 1; j < items.length; j++) {
+            if (items[j].type !== 'word') continue; // skip spaces & punctuation
+            if (items[j].phraseKey === item.phraseKey) { end = j; }
+            else { break; }
+          }
+          const group = document.createElement('span');
+          group.className = 'phrase-group phrase-' + (item.phraseLevel || 'red');
+          const lb = document.createElement('span'); lb.className = 'phrase-bracket'; lb.textContent = '[';
+          const rb = document.createElement('span'); rb.className = 'phrase-bracket'; rb.textContent = ']';
+          group.appendChild(lb);
+          for (let j = i; j <= end; j++) {
+            if (items[j].type === 'word') { group.appendChild(makeWordSpan(items[j], true)); }
+            else { group.appendChild(document.createTextNode(items[j].text)); }
+          }
+          group.appendChild(rb);
+          // Wrap syntax groups around phrase if needed
+          if (item.synType) { const sg = document.createElement('span'); sg.className = 'syn-group syn-' + item.synType; sg.appendChild(group); sentSpan.appendChild(sg); }
+          else { sentSpan.appendChild(group); }
+          i = end + 1;
+        } else if (item.type === 'word' && item.synType) {
+          // Group contiguous same-type syntax words
+          let end = i;
+          for (let j = i + 1; j < items.length; j++) {
+            if (items[j].type === 'word') {
+              if (items[j].synType === item.synType) { end = j; }
+              else { break; }
+            }
+          }
+          const group = document.createElement('span');
+          group.className = 'syn-group syn-' + item.synType;
+          for (let j = i; j <= end; j++) {
+            if (items[j].type === 'word') { group.appendChild(makeWordSpan(items[j], false)); }
+            else { group.appendChild(document.createTextNode(items[j].text)); }
+          }
+          sentSpan.appendChild(group);
+          i = end + 1;
+        } else if (item.type === 'word') {
+          sentSpan.appendChild(makeWordSpan(item, false));
+          i++;
+        } else {
+          sentSpan.appendChild(document.createTextNode(item.text));
+          i++;
+        }
+      }
+
+      pEl.appendChild(sentSpan);
+
+      // Sentence marker [n] — shows blue when there are notes or collected
+      const sMarker = document.createElement('sup');
+      sMarker.className = 'sent-marker';
+      const hasNotes = (sentenceNotes[sentId] && sentenceNotes[sentId].trim()) || sentenceData.some(s => s.sentId === sentId);
+      if (hasNotes) sMarker.classList.add('has-notes');
+      sMarker.textContent = `[${sentCount}]`;
+      sMarker.dataset.sentId = sentId;
+      sMarker.onclick = () => { lastSentText = sentText; selectedSentId = sentId; toggleSentenceCard(sentId, sentText, sMarker); };
+      pEl.appendChild(sMarker);
+      pEl.appendChild(document.createTextNode(' '));
+    });
+    container.appendChild(pEl);
+  });
+}
+
+// ============================================================
+// INLINE SENTENCE CARD
+// ============================================================
+let openCardSentId = null;
+
+function toggleSentenceCard(sentId, sentText, markerEl) {
+  // If clicking the same marker, close the card
+  if (openCardSentId === sentId) {
+    closeSentenceCard();
+    return;
+  }
+  // Close existing card
+  closeSentenceCard();
+
+  // Create new card
+  const card = document.createElement('div');
+  card.className = 'sentence-card';
+  card.id = 'sentenceCard';
+
+  // Render sentence with clickable words
+  const parts = sentText.split(/(\s+)/);
+  let wordIdx = 0;
+  const cardWordsHtml = parts.map(part => {
+    if (part.trim() === '') return part;
+    const clean = part.replace(/[^a-zA-Z]/g,'').toLowerCase();
+    if (!clean.length) return escHtml(part);
+    const vm = vocabData.find(v => v.wordLower === clean && v.sentenceId === sentId);
+    const sm = syntaxData.filter(s => s.sentId === sentId && s.wordIndices.includes(wordIdx));
+    const level = vm ? vm.level : '';
+    const synType = sm.length ? sm[0].type : '';
+    const idx = wordIdx;
+    wordIdx++;
+    let cls = 'word-clickable';
+    if (level) cls += ' vocab-' + level;
+    let synPre = '', synPost = '';
+    if (synType) { synPre = `<span class="syn-group syn-${synType}">`; synPost = '</span>'; }
+    return `${synPre}<span class="${cls}" data-w="${idx}" data-clean="${clean}" data-sent-id="${sentId}" data-word="${escHtml(part)}" onclick="event.stopPropagation();handleWordClick(this,'${sentId}','${escHtml(sentText).replace(/'/g,"\\'")}','${clean}','${escHtml(part).replace(/'/g,"\\'")}',event)">${escHtml(part)}</span>${synPost}`;
+  }).join('');
+
+  const isCollected = sentenceData.some(s => s.sentId === sentId);
+  const savedNote = sentenceNotes[sentId] || '';
+
+  card.innerHTML = `
+    <div class="card-sentence">${cardWordsHtml}</div>
+    <div class="card-label">我的理解</div>
+    <textarea class="card-notes" id="cardNoteInput" placeholder="写下你对这句话的理解、翻译..." oninput="saveCardNote('${sentId}')">${escHtml(savedNote)}</textarea>
+    <span class="card-saved-hint" id="cardSavedHint">已保存</span>
+    <div class="card-actions">
+      <button class="${isCollected?'collected':''}" onclick="collectSentence('${sentId}')">${isCollected?'★ Collected':'☆ 收藏句式'}</button>
+    </div>
+  `;
+
+  // Insert after the marker
+  markerEl.parentNode.insertBefore(card, markerEl.nextSibling);
+  openCardSentId = sentId;
+}
+
+function closeSentenceCard() {
+  const card = document.getElementById('sentenceCard');
+  if (card) card.remove();
+  openCardSentId = null;
+}
+
+function saveCardNote(sentId) {
+  const val = document.getElementById('cardNoteInput').value;
+  sentenceNotes[sentId] = val;
+  saveNotes();
+  const hint = document.getElementById('cardSavedHint');
+  hint.classList.add('show');
+  clearTimeout(window._noteTimer);
+  window._noteTimer = setTimeout(() => hint.classList.remove('show'), 2000);
+  // Update marker state
+  const hasNotes = val.trim() || sentenceData.some(s => s.sentId === sentId);
+  const marker = document.querySelector(`.sent-marker[data-sent-id="${sentId}"]`);
+  if (marker) {
+    if (hasNotes) marker.classList.add('has-notes');
+    else marker.classList.remove('has-notes');
+  }
+}
+
+// ============================================================
+// WORD CLICK & POPUP
+// ============================================================
+function clearRangeHighlight() {
+  document.querySelectorAll('.word-clickable.range-start, .word-clickable.range-selected').forEach(el => {
+    el.classList.remove('range-start', 'range-selected');
+  });
+}
+
+function showUnifiedPopup(el, sentId, clean, origWord, sentText) {
+  const wordIdx = parseInt(el.dataset.w);
+  const existingVocab = vocabData.find(v => v.wordLower === clean && v.sentenceId === sentId);
+  const wordSyntax = syntaxData.filter(s => s.sentId === sentId && s.wordIndices.includes(wordIdx));
+
+  currentSyntaxSelection = { sentId, indices: [wordIdx], wordSpans: [el] };
+  currentWord = { word: clean, displayWord: origWord.replace(/[^a-zA-Z]/g,''), sentId, sentText };
+  multiWordMode = false;
+  multiWordStart = null;
+  clearRangeHighlight();
+  el.classList.add('range-start');
+
+  const popup = document.getElementById('vocabPopup');
+  const rect = el.getBoundingClientRect();
+  let left = rect.left + rect.width/2 - 160, top = rect.bottom + 4;
+  if (left < 10) left = 10;
+  if (left + 320 > window.innerWidth - 10) left = window.innerWidth - 330;
+  if (top + 160 > window.innerHeight) top = rect.top - 160;
+  popup.style.left = left + 'px'; popup.style.top = top + 'px'; popup.style.display = 'block';
+
+  // Render vocab row (DOM — no innerHTML hack)
+  const vocabRow = document.getElementById('vocabColors');
+  vocabRow.innerHTML = '<span class="popup-label">生词</span>';
+  ['red','yellow'].forEach(lvl => {
+    const btn = document.createElement('div');
+    btn.className = 'color-btn ' + lvl;
+    if (existingVocab && existingVocab.level === lvl) btn.classList.add('active');
+    btn.title = lvl;
+    btn.onclick = function() { markWord(lvl); };
+    vocabRow.appendChild(btn);
+  });
+
+  // Render hint row (separate sibling div — proper DOM)
+  const hintRow = document.getElementById('vocabHintRow');
+  if (existingVocab) {
+    hintRow.innerHTML = '<span class="popup-label">提示</span>';
+    const inp = document.createElement('textarea');
+    inp.className = 'hint-input';
+    inp.id = 'hintInput';
+    inp.rows = 1;
+    inp.value = existingVocab.hint || '';
+    inp.placeholder = '中文记忆线索...';
+    inp.oninput = function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; saveVocabHint(); };
+    hintRow.appendChild(inp);
+    hintRow.style.display = '';
+  } else {
+    hintRow.innerHTML = '';
+    hintRow.style.display = 'none';
+  }
+
+  // Render syntax row — only for unmarked words
+  const synRow = document.getElementById('vocabSynRow');
+  if (!existingVocab) {
+    let shtml = '<span class="popup-label">语法</span>';
+    SYNTAX_TYPES.forEach(t => {
+      shtml += `<button class="syn-btn syn-${t.id}${wordSyntax.some(s => s.type === t.id) ? ' active' : ''}" onclick="applySyntaxFromPopup('${t.id}')" title="${t.name}">${t.label}</button>`;
+    });
+    shtml += `<button class="multi-toggle" id="multiToggle" onclick="toggleMultiWord()">多词模式</button>`;
+    synRow.innerHTML = shtml;
+    synRow.style.display = '';
+  } else {
+    synRow.innerHTML = '';
+    synRow.style.display = 'none';
+  }
+}
+
+function handleWordClick(el, sentId, sentText, clean, origWord, event) {
+  // Multi-word mode: second click selects range
+  if (multiWordMode && multiWordStart && multiWordStart.sentId === sentId) {
+    event.preventDefault();
+    const startIdx = multiWordStart.wordIdx;
+    const endIdx = parseInt(el.dataset.w);
+    const from = Math.min(startIdx, endIdx);
+    const to = Math.max(startIdx, endIdx);
+
+    const sentSpan = el.closest('.sentence');
+    if (!sentSpan) return;
+    const allWords = sentSpan.querySelectorAll('.word-clickable');
+    const wordSpans = [];
+    const indices = [];
+    clearRangeHighlight();
+    allWords.forEach(ws => {
+      const w = parseInt(ws.dataset.w);
+      if (w >= from && w <= to) {
+        wordSpans.push(ws);
+        indices.push(w);
+        ws.classList.add('range-selected');
+      }
+    });
+
+    if (wordSpans.length >= 2) {
+      currentSyntaxSelection = { sentId, indices: indices.sort((a,b)=>a-b), wordSpans };
+      // Check if this range is already marked as a phrase
+      const phraseEntry = vocabData.find(v => v.wordIndices && v.wordIndices.length > 1 && v.sentenceId === sentId && v.wordIndices.length === indices.length && v.wordIndices.every(i => indices.includes(i)));
+      // Update vocab row for phrase marking (DOM)
+      const vocabRow = document.getElementById('vocabColors');
+      vocabRow.innerHTML = '<span class="popup-label">短语</span>';
+      ['red','yellow'].forEach(lvl => {
+        const btn = document.createElement('div');
+        btn.className = 'color-btn ' + lvl;
+        if (phraseEntry && phraseEntry.level === lvl) btn.classList.add('active');
+        btn.title = lvl;
+        btn.onclick = function() { markWord(lvl); };
+        vocabRow.appendChild(btn);
+      });
+      // Hint row (proper DOM)
+      const hintRow = document.getElementById('vocabHintRow');
+      if (phraseEntry) {
+        hintRow.innerHTML = '<span class="popup-label">提示</span>';
+        const inp = document.createElement('textarea');
+        inp.className = 'hint-input';
+        inp.id = 'hintInput';
+        inp.rows = 1;
+        inp.value = phraseEntry.hint || '';
+        inp.placeholder = '中文记忆线索...';
+        inp.oninput = function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; saveVocabHint(); };
+        hintRow.appendChild(inp);
+        hintRow.style.display = '';
+      } else {
+        hintRow.innerHTML = '';
+        hintRow.style.display = 'none';
+      }
+      // Update syntax row
+      const synRow = document.getElementById('vocabSynRow');
+      synRow.style.display = '';
+      let shtml = '<span class="popup-label">语法(' + indices.length + '词)</span>';
+      SYNTAX_TYPES.forEach(t => {
+        const existing = syntaxData.filter(s => s.sentId === sentId);
+        const active = existing.some(s => s.type === t.id && s.wordIndices.some(i => indices.includes(i)));
+        shtml += `<button class="syn-btn syn-${t.id}${active ? ' active' : ''}" onclick="applySyntaxFromPopup('${t.id}')" title="${t.name}">${t.label}</button>`;
+      });
+      shtml += `<button class="multi-toggle on" id="multiToggle" onclick="toggleMultiWord()">多词模式</button>`;
+      synRow.innerHTML = shtml;
+    }
+    return;
+  }
+
+  showUnifiedPopup(el, sentId, clean, origWord, sentText);
+}
+
+function toggleMultiWord() {
+  multiWordMode = !multiWordMode;
+  const btn = document.getElementById('multiToggle');
+  if (multiWordMode) {
+    btn.textContent = '点击第二个词...';
+    btn.classList.add('on');
+    multiWordStart = {
+      el: document.querySelector('.word-clickable.range-start'),
+      sentId: currentWord.sentId,
+      wordIdx: parseInt(document.querySelector('.word-clickable.range-start')?.dataset?.w || 0)
+    };
+  } else {
+    btn.textContent = '多词模式';
+    btn.classList.remove('on');
+    multiWordStart = null;
+    clearRangeHighlight();
+    const el = document.querySelector(`.word-clickable[data-sent-id="${currentWord?.sentId}"][data-w="${currentSyntaxSelection?.indices?.[0]}"]`);
+    if (el) el.classList.add('range-start');
+    if (currentSyntaxSelection) {
+      currentSyntaxSelection = { sentId: currentWord.sentId, indices: [currentSyntaxSelection.indices[0]], wordSpans: [el] };
+    }
+  }
+}
+
+function saveVocabHint() {
+  const hint = document.getElementById('hintInput')?.value || '';
+  if (currentSyntaxSelection && currentSyntaxSelection.indices.length >= 2) {
+    const { sentId, indices } = currentSyntaxSelection;
+    const entry = vocabData.find(v => v.wordIndices && v.wordIndices.length === indices.length && v.sentenceId === sentId && v.wordIndices.every(i => indices.includes(i)));
+    if (entry) { entry.hint = hint; saveVocab(); renderVocab(); }
+  } else if (currentWord) {
+    const { word, sentId } = currentWord;
+    const entry = vocabData.find(v => !v.wordIndices && v.wordLower === word && v.sentenceId === sentId);
+    if (entry) { entry.hint = hint; saveVocab(); renderVocab(); }
+  }
+}
+
+function markWord(level) {
+  // Handle phrase marking (multi-word selection)
+  if (currentSyntaxSelection && currentSyntaxSelection.indices.length >= 2) {
+    const { sentId, indices, wordSpans } = currentSyntaxSelection;
+    const phraseText = wordSpans.map(s => s.dataset.word).join(' ');
+    const phraseLower = indices.map(i => wordSpans.find(s => parseInt(s.dataset.w) === i)?.dataset.clean || '').join('');
+    const sentText = wordSpans[0]?.closest('.sentence')?.textContent || '';
+    const existing = vocabData.find(v => v.wordIndices && v.wordIndices.length === indices.length && v.sentenceId === sentId && v.wordIndices.every(i => indices.includes(i)));
+    vocabData = vocabData.filter(v => !(v.wordIndices && v.wordIndices.length === indices.length && v.sentenceId === sentId && v.wordIndices.every(i => indices.includes(i))));
+    if (existing && existing.level === level) {
+      saveVocab(); closePopup(); renderArticle(); renderVocab();
+      if (openCardSentId) { const marker = document.querySelector(`.sent-marker[data-sent-id="${openCardSentId}"]`); if (marker) { const sid = openCardSentId; closeSentenceCard(); toggleSentenceCard(sid, lastSentText, marker); } }
+      return;
+    }
+    const prevHint = existing ? existing.hint || '' : '';
+    vocabData.push({ word: phraseText, wordLower: phraseLower, wordIndices: indices, level, hint: prevHint, sentenceId: sentId, sentText: sentText.substring(0,100), date: todayStr(), stage: 0, reviewedDate: todayStr() });
+    saveVocab(); closePopup(); renderArticle(); renderVocab();
+    if (openCardSentId) { const marker = document.querySelector(`.sent-marker[data-sent-id="${openCardSentId}"]`); if (marker) { const sid = openCardSentId; closeSentenceCard(); toggleSentenceCard(sid, lastSentText || sentText, marker); } }
+    return;
+  }
+
+  // Single-word marking
+  if (!currentWord) return;
+  const { word, displayWord, sentId, sentText } = currentWord;
+  const existing = vocabData.find(v => !v.wordIndices && v.wordLower === word && v.sentenceId === sentId);
+  vocabData = vocabData.filter(v => !(v.wordIndices === undefined && v.wordLower === word && v.sentenceId === sentId));
+  if (existing && existing.level === level) {
+    saveVocab(); closePopup(); renderArticle(); renderVocab();
+    if (openCardSentId) {
+      const marker = document.querySelector(`.sent-marker[data-sent-id="${openCardSentId}"]`);
+      if (marker) { const sid = openCardSentId; closeSentenceCard(); toggleSentenceCard(sid, lastSentText || sentText, marker); }
+    }
+    return;
+  }
+  if (level !== 'remove') {
+    const prevHint = existing ? existing.hint || '' : '';
+    vocabData.push({ word: displayWord, wordLower: word, level, hint: prevHint, sentenceId: sentId, sentText: sentText.substring(0,100), date: todayStr(), stage: 0, reviewedDate: todayStr() });
+  }
+  saveVocab(); closePopup(); renderArticle(); renderVocab();
+  // Refresh card if open
+  if (openCardSentId) {
+    const marker = document.querySelector(`.sent-marker[data-sent-id="${openCardSentId}"]`);
+    if (marker) { const sid = openCardSentId; closeSentenceCard(); toggleSentenceCard(sid, lastSentText || sentText, marker); }
+  }
+}
+
+function applySyntaxFromPopup(typeId) {
+  if (!currentSyntaxSelection) return;
+  const { sentId, indices } = currentSyntaxSelection;
+  const idxSet = new Set(indices);
+
+  const existing = syntaxData.filter(s => s.sentId === sentId && s.type === typeId);
+  const allMatch = existing.some(s => s.wordIndices.length === indices.length && s.wordIndices.every(i => idxSet.has(i)));
+  if (allMatch) {
+    syntaxData = syntaxData.filter(s => !(s.sentId === sentId && s.type === typeId && s.wordIndices.length === indices.length && s.wordIndices.every(i => idxSet.has(i))));
+  } else {
+    syntaxData = syntaxData.filter(s => {
+      if (s.sentId !== sentId) return true;
+      return !s.wordIndices.some(i => idxSet.has(i));
+    });
+    syntaxData.push({ sentId, wordIndices: indices, type: typeId });
+  }
+  saveSyntax(); closePopup(); multiWordMode = false; multiWordStart = null;
+  clearRangeHighlight(); renderArticle();
+  // Refresh card if open
+  if (openCardSentId) {
+    const marker = document.querySelector(`.sent-marker[data-sent-id="${openCardSentId}"]`);
+    if (marker) { const sid = openCardSentId; closeSentenceCard(); toggleSentenceCard(sid, lastSentText, marker); }
+  }
+}
+
+function closePopup() { document.getElementById('vocabPopup').style.display = 'none'; currentWord = null; multiWordMode = false; multiWordStart = null; clearRangeHighlight(); }
+
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.vocab-popup')) {
+    if (!multiWordMode) { closePopup(); }
+    if (!e.target.closest('.word-clickable')) {
+      if (!multiWordMode) { clearRangeHighlight(); }
+    }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closePopup(); closeSentenceCard(); if (reviewExpanded) toggleReviewSize(); }
+});
+
+// ============================================================
+// SENTENCE COLLECTION
+// ============================================================
+function collectSentence(sentId) {
+  if (sentenceData.find(s => s.sentId === sentId)) { alert('Already collected!'); return; }
+  const el = document.querySelector(`[data-sent-id="${sentId}"]`);
+  if (!el) return;
+  const sentText = el.textContent;
+  const paraNum = parseInt(el.dataset.para), sentNum = parseInt(el.dataset.sent);
+  currentCollectSent = { sentId, sentText, paraNum, sentNum };
+  document.getElementById('modalSentenceText').textContent = sentText;
+  const tagC = document.getElementById('modalTags');
+  tagC.innerHTML = '';
+  [...FUNC_TAGS,...STRUCT_TAGS,...TOPIC_TAGS].forEach(tag => {
+    const s = document.createElement('span'); s.className = 'tag'; s.textContent = tag;
+    s.addEventListener('click', () => s.classList.toggle('selected'));
+    tagC.appendChild(s);
+  });
+  document.getElementById('modalImitation').value = '';
+  document.getElementById('modalParaphrase').value = '';
+  document.getElementById('modalError').textContent = '';
+  document.getElementById('sentenceModal').style.display = 'flex';
+}
+
+function closeSentenceModal() { document.getElementById('sentenceModal').style.display = 'none'; currentCollectSent = null; }
+
+function saveSentence() {
+  if (!currentCollectSent) return;
+  const imitation = document.getElementById('modalImitation').value.trim();
+  const paraphrase = document.getElementById('modalParaphrase').value.trim();
+  if (!imitation && !paraphrase) { document.getElementById('modalError').textContent = 'Write at least an imitation or paraphrase.'; return; }
+  const tags = Array.from(document.querySelectorAll('#modalTags .tag.selected')).map(t => t.textContent);
+  sentenceData.push({ id:Date.now(), sentText:currentCollectSent.sentText, paraNum:currentCollectSent.paraNum, sentNum:currentCollectSent.sentNum, sentId:currentCollectSent.sentId, tags, imitation, paraphrase, date:todayStr(), source:'IELTS-Reader' });
+  saveSentences(); closeSentenceModal(); renderSentences();
+  // Update marker and card
+  const marker = document.querySelector(`.sent-marker[data-sent-id="${currentCollectSent.sentId}"]`);
+  if (marker) marker.classList.add('has-notes');
+  if (openCardSentId === currentCollectSent.sentId) {
+    const sid = currentCollectSent.sentId;
+    closeSentenceCard();
+    if (marker) toggleSentenceCard(sid, currentCollectSent.sentText, marker);
+  }
+}
+
+// ============================================================
+// VOCABULARY LIST
+// ============================================================
+let vocabFilter = 'all';
+function renderVocab() {
+  const list = document.getElementById('vocab-list');
+  let filtered = vocabFilter === 'all' ? vocabData : vocabData.filter(v => v.level === vocabFilter);
+  const grouped = {};
+  filtered.forEach(v => { const k = v.wordLower; if (!grouped[k]) grouped[k] = []; grouped[k].push(v); });
+  const sorted = Object.entries(grouped).sort((a,b) => Math.min(...a[1].map(v=>({red:0,yellow:1})[v.level]??1)) - Math.min(...b[1].map(v=>({red:0,yellow:1})[v.level]??1)));
+  if (!sorted.length) { list.innerHTML = '<div class="vocab-empty">No vocabulary marked yet.</div>'; return; }
+  list.innerHTML = sorted.map(([wl,entries]) => {
+    const e = entries[0]; const label = {red:'🔴',yellow:'🟡'}[e.level];
+    const hint = e.hint ? ` <span style="color:#888;font-size:12px;">${escHtml(e.hint)}</span>` : '';
+    const ctx = [...new Set(entries.map(x=>x.sentText))].slice(0,1)[0]||'';
+    return `<div class="vocab-list-item" onclick="scrollToSent('${e.sentenceId}')"><span class="level-dot ${e.level}"></span><span class="word">${label} ${e.word}${hint}</span><span class="context">${escHtml(ctx)}</span></div>`;
+  }).join('');
+}
+
+function scrollToSent(sentId) {
+  const el = document.querySelector(`[data-sent-id="${sentId}"]`);
+  if (el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('highlight'); setTimeout(()=>el.classList.remove('highlight'),2000); }
+}
+
+// ============================================================
+// SENTENCES LIST
+// ============================================================
+function renderSentences() {
+  const list = document.getElementById('sentences-list');
+  if (!sentenceData.length) { list.innerHTML = '<div class="vocab-empty">No sentences collected yet.</div>'; return; }
+  list.innerHTML = sentenceData.slice().reverse().map(s => {
+    const tags = (s.tags||[]).map(t => '<span class="tag">' + t + '</span>').join('');
+    return '<div class="sentence-item" onclick="scrollToSent(\'' + s.sentId + '\')"><div class="s-text">' + escHtml(s.sentText) + '</div>' +
+      (s.imitation ? '<div style="font-size:12px;color:#389e6b;margin-top:2px;">✎ Imitation: ' + escHtml(s.imitation) + '</div>' : '') +
+      (s.paraphrase ? '<div style="font-size:12px;color:#2b5797;margin-top:2px;">✍ Paraphrase: ' + escHtml(s.paraphrase) + '</div>' : '') +
+      '<div class="s-meta">P' + s.paraNum + ' · ' + s.date + (tags ? ' · ' + tags : '') + '</div></div>';
+  }).join('');
+}
+
+// ============================================================
+// PANEL TABS
+// ============================================================
+document.querySelectorAll('.panel-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.panel-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('tab-vocab').style.display = tab === 'vocab' ? 'block' : 'none';
+    document.getElementById('tab-sentences').style.display = tab === 'sentences' ? 'block' : 'none';
+    document.getElementById('tab-review').style.display = tab === 'review' ? 'block' : 'none';
+    if (tab === 'sentences') renderSentences();
+    if (tab === 'review') startReview();
+  });
+});
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => { b.style.background='white'; b.style.color='var(--text)'; });
+    btn.style.background='var(--accent)'; btn.style.color='white'; vocabFilter = btn.dataset.filter; renderVocab();
+  });
+});
+
+// ============================================================
+// EXPORT
+// ============================================================
+function exportObsidian() {
+  if (!articleData) { alert('No article loaded.'); return; }
+  const date = todayStr();
+  const slug = slugify(articleData.title);
+  const noteFileName = date + '-' + slug;
+
+  let md = '# '+date+' 精读笔记\n\n- **文章**：'+articleData.title+'\n- **来源**：'+(articleData.source||'—')+'\n- **日期**：'+date+'\n\n---\n\n';
+
+  // ── Annotated article (pure markdown, no HTML) ──
+  md += '## 原文\n\n';
+  let sentCount = 0;
+  articleData.paragraphs.forEach((sents, pIdx) => {
+    const paraNum = pIdx + 1;
+    let paraText = '';
+    sents.forEach((sentText) => {
+      sentCount++;
+      const sentId = 'p' + paraNum + '-s' + sentCount;
+      const parts = sentText.split(/(\s+)/);
+      let wordIdx = 0;
+      parts.forEach(part => {
+        if (part.trim() === '') { paraText += part; return; }
+        const clean = part.replace(/[^a-zA-Z]/g, '').toLowerCase();
+        if (!clean.length) { paraText += part; return; }
+        const pm = vocabData.find(v => v.wordIndices && v.wordIndices.length > 1 && v.sentenceId === sentId && v.wordIndices.includes(wordIdx));
+        const vm = vocabData.find(v => !v.wordIndices && v.wordLower === clean && v.sentenceId === sentId);
+        const entry = pm || vm;
+        if (entry) {
+          if (entry.level === 'red') {
+            paraText += '<mark style="background:#fca5a5">' + part + '</mark>';
+          } else {
+            paraText += '==' + part + '==';
+          }
+        } else {
+          paraText += part;
+        }
+        wordIdx++;
+      });
+      const hasNote = sentenceNotes[sentId] && sentenceNotes[sentId].trim();
+      const hasCollected = sentenceData.some(s => s.sentId === sentId);
+      if (hasNote || hasCollected) paraText += ' [*]';
+    });
+    md += paraText + '\n\n';
+  });
+
+  // ── Sentence notes ──
+  const noteEntries = Object.entries(sentenceNotes).filter(([,v]) => v.trim());
+  if (noteEntries.length) {
+    md += '## 句子理解\n\n';
+    noteEntries.forEach(([sentId, note]) => {
+      md += '- \[' + sentId.split('-s')[1] + '\] ' + escMd(note) + '\n';
+    });
+    md += '\n';
+  }
+
+  // ── Vocab table ──
+  if (vocabData.length) {
+    md += '## 生词\n\n| 级别 | 单词 | 提示 |\n|------|------|------|\n';
+    const seen = new Set();
+    vocabData.forEach(v => {
+      const k = v.wordLower + '|' + v.sentenceId;
+      if (seen.has(k)) return; seen.add(k);
+      md += '| ' + ({red:'🔴',yellow:'🟡'}[v.level]||'') + ' | **' + escMd(v.word) + '** | ' + (v.hint||'') + ' |\n';
+    });
+    md += '\n';
+  }
+
+  // ── Sentence collection ──
+  if (sentenceData.length) {
+    md += '## 句式收集\n\n| 原文 | 仿写 | 改写 | 标签 |\n|------|------|------|------|\n';
+    sentenceData.forEach(s => {
+      md += '| ' + escMd(s.sentText) + ' | ' + escMd(s.imitation||'') + ' | ' + escMd(s.paraphrase||'') + ' | ' + (s.tags||[]).join(', ') + ' |\n';
+    });
+    md += '\n';
+  }
+
+  downloadFile(noteFileName + '.md', md);
+  alert('已下载: ' + noteFileName + '.md');
+}
+
+function exportJson() {
+  const data = {exportDate:new Date().toISOString(), article:articleData, vocab:vocabData, sentences:sentenceData, syntax:syntaxData, sentenceNotes};
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='ielts-data-'+todayStr()+'.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportSnapshot() {
+  const data = {article:articleData, vocab:vocabData, sentences:sentenceData, syntax:syntaxData, sentenceNotes};
+  const html = '<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+  const encoded = encodeURIComponent(JSON.stringify(data));
+  const seed = "\n(function(){try{var d=JSON.parse(decodeURIComponent('"+encoded+"'));if(d.article)localStorage.setItem('ielts_article',JSON.stringify(d.article));if(d.vocab)localStorage.setItem('ielts_vocab',JSON.stringify(d.vocab));if(d.sentences)localStorage.setItem('ielts_sentences',JSON.stringify(d.sentences));if(d.syntax)localStorage.setItem('ielts_syntax',JSON.stringify(d.syntax));if(d.sentenceNotes)localStorage.setItem('ielts_sentence_notes',JSON.stringify(d.sentenceNotes));}catch(e){console.error('Snapshot error',e)}})();\n";
+  const finalHtml = html.replace('function loadAll()', seed+'function loadAll()');
+  const blob = new Blob([finalHtml], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='ielts-snapshot-'+todayStr()+'.html'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJson(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.vocab) { const seen = new Map(vocabData.map(v=>[v.wordLower+'-'+v.sentenceId, v])); data.vocab.forEach(v=>{const k=(v.wordLower||v.word.toLowerCase())+'-'+v.sentenceId; if(!seen.has(k)) seen.set(k,v);}); vocabData = Array.from(seen.values()); saveVocab(); }
+      if (data.sentences) { const seen = new Map(sentenceData.map(s=>[s.sentId, s])); data.sentences.forEach(s=>{if(!seen.has(s.sentId)) seen.set(s.sentId, s);}); sentenceData = Array.from(seen.values()); saveSentences(); }
+      if (data.syntax) { syntaxData = data.syntax; saveSyntax(); }
+      if (data.sentenceNotes) { sentenceNotes = data.sentenceNotes; saveNotes(); }
+      renderAll(); renderVocab(); renderSentences();
+      alert('Imported!');
+    } catch(err) { alert('Invalid file.'); }
+  }; reader.readAsText(file); event.target.value = '';
+}
+
+function importSnapshot(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const html = e.target.result;
+      const m = html.match(/decodeURIComponent\('([^']+)'\)/);
+      if (!m) { alert('No snapshot data found in this HTML file.'); return; }
+      const data = JSON.parse(decodeURIComponent(m[1]));
+      if (!data.article) { alert('Invalid snapshot data.'); return; }
+      const title = data.article.title || 'Imported';
+      const source = data.article.source || 'imported';
+      const baseId = slugify(source || title || 'imported') || 'imported';
+      let id = baseId;
+      const store = getArticleIndex();
+      let counter = 1;
+      while (store[id]) id = baseId + '-' + (counter++);
+      store[id] = { id, title, source, created: todayStr(), modified: todayStr(), vocabCount: (data.vocab||[]).length, sentCount: (data.sentences||[]).length };
+      saveArticleIndex(store);
+      localStorage.setItem(getArticleStoreKey(id), JSON.stringify({ article: data.article, vocab: data.vocab || [], sentences: data.sentences || [], syntax: data.syntax || [], notes: data.sentenceNotes || {} }));
+      alert('Imported: ' + title);
+      showDashboard();
+    } catch(err) { alert('Failed to parse snapshot: ' + err.message); }
+  }; reader.readAsText(file); event.target.value = '';
+}
+
+function copyVocabList() {
+  const r = [...new Set(vocabData.filter(v => v.level === 'red').map(v => v.word))];
+  const y = [...new Set(vocabData.filter(v => v.level === 'yellow').map(v => v.word))];
+  let text = '🔴 特别不熟悉（' + r.length + '个）\n';
+  text += r.join(', ') + '\n\n';
+  text += '🟡 不熟悉（' + y.length + '个）\n';
+  text += y.join(', ');
+  const ta = document.createElement('textarea'); ta.value = text;
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  alert('已复制 ' + (r.length + y.length) + ' 个单词');
+}
+
+let panelCollapsed = false;
+
+function togglePanel() {
+  panelCollapsed = !panelCollapsed;
+  const panel = document.getElementById('rightPanel');
+  const toggle = document.getElementById('panelToggle');
+  const left = document.getElementById('leftPanel');
+  panel.classList.toggle('collapsed');
+  toggle.classList.toggle('collapsed');
+  left.classList.toggle('full');
+  toggle.textContent = panelCollapsed ? '▶' : '◀';
+}
+
+function clearAllData() {
+  if (!confirm('Delete ALL articles and all data? This cannot be undone!')) return;
+  const store = getArticleIndex();
+  Object.keys(store).forEach(id => localStorage.removeItem(getArticleStoreKey(id)));
+  localStorage.removeItem('ielts_index');
+  localStorage.removeItem('ielts_last_article');
+  currentArticleId = null; articleData = null;
+  vocabData=[]; sentenceData=[]; syntaxData=[]; sentenceNotes={};
+  renderAll(); renderVocab(); renderSentences();
+  showDashboard();
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function escHtml(s) { const d = document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function escMd(s) { if (!s) return ''; return s.replace(/\|/g,'\\|').replace(/\n/g,' '); }
+function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').substring(0,40); }
+function downloadFile(name, content) {
+  const blob = new Blob([content], {type:'text/markdown;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// SRS REVIEW SYSTEM
+// ============================================================
+const SRS_INTERVALS = [0, 1, 2, 4, 7, 14];
+
+function ensureStage(entry) {
+  if (entry.stage === undefined) entry.stage = 0;
+  if (!entry.reviewedDate) entry.reviewedDate = entry.date || todayStr();
+  return entry;
+}
+
+function getReviewQueue() {
+  const today = todayStr();
+  const seen = new Set();
+  const queue = [];
+  vocabData.forEach(v => {
+    ensureStage(v);
+    const k = v.wordLower + '|' + v.sentenceId;
+    if (seen.has(k)) return;
+    seen.add(k);
+    if (!v.word) return;
+    const daysSince = daysBetween(v.reviewedDate, today);
+    if (daysSince >= SRS_INTERVALS[v.stage]) {
+      queue.push(v);
+    }
+  });
+  for (let i = queue.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [queue[i], queue[j]] = [queue[j], queue[i]];
+  }
+  return queue;
+}
+
+function daysBetween(d1, d2) {
+  const a = new Date(d1 + 'T00:00:00');
+  const b = new Date(d2 + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+
+function updateStage(entry, correct) {
+  ensureStage(entry);
+  entry.stage = correct ? Math.min(5, entry.stage + 1) : Math.max(0, entry.stage - 1);
+  entry.reviewedDate = todayStr();
+  saveVocab();
+}
+
+function getSentTextById(sentId) {
+  if (!articleData) return '';
+  const m = sentId.match(/p(\d+)-s(\d+)/);
+  if (!m) return '';
+  const globalIdx = parseInt(m[2]);
+  let count = 0;
+  for (const para of articleData.paragraphs) {
+    for (const sent of para) {
+      count++;
+      if (count === globalIdx) return sent;
+    }
+  }
+  return '';
+}
+
+function makeCloze(sentText, entry) {
+  const word = entry.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (entry.wordIndices && entry.wordIndices.length > 1) {
+    const blanks = '______ '.repeat(entry.wordIndices.length).trim();
+    return sentText.replace(new RegExp(word.replace(/\s+/g, '\\s+'), 'gi'), blanks);
+  }
+  return sentText.replace(new RegExp('\\b' + word + '\\b', 'gi'), '______');
+}
+
+// Review state
+let reviewQueue = [];
+let reviewIndex = 0;
+let reviewStats = { correct: 0, incorrect: 0 };
+let reviewExpanded = false;
+
+function startReview() {
+  reviewQueue = getReviewQueue();
+  reviewIndex = 0;
+  reviewStats = { correct: 0, incorrect: 0 };
+  showReviewCard();
+}
+
+function showReviewCard() {
+  const card = document.getElementById('reviewCard');
+  const progressEl = document.getElementById('reviewProgress');
+  const labelEl = document.getElementById('reviewLabel');
+  const barFill = document.getElementById('reviewBarFill');
+
+  // Remove any existing overlay first
+  const oldOverlay = document.getElementById('reviewOverlay');
+  if (oldOverlay) {
+    const inner = oldOverlay.firstElementChild;
+    if (inner && inner.parentNode) inner.remove();
+    oldOverlay.remove();
+  }
+
+  if (reviewIndex >= reviewQueue.length) {
+    const total = reviewStats.correct + reviewStats.incorrect;
+    labelEl.textContent = `Done! ${reviewStats.correct}/${total}`;
+    barFill.style.width = '100%';
+    card.innerHTML = '<div class="review-empty">🎉 All words reviewed for today!</div>';
+    if (reviewExpanded) toggleReviewSize();
+    return;
+  }
+
+  const entry = reviewQueue[reviewIndex];
+  const fullSent = getSentTextById(entry.sentenceId) || entry.sentText || '';
+  const clozeSent = fullSent ? makeCloze(fullSent, entry) : '______';
+  const total = reviewQueue.length;
+  const done = reviewStats.correct + reviewStats.incorrect;
+
+  labelEl.textContent = `${reviewIndex + 1} / ${total}  ✓${reviewStats.correct} ✗${reviewStats.incorrect}`;
+  barFill.style.width = (done / total * 100) + '%';
+
+  const sizeLabel = reviewExpanded ? '缩小' : '放大';
+  const sizeBtn = '<button class="review-size-btn" id="reviewSizeBtn" onclick="toggleReviewSize()">' + sizeLabel + '</button>';
+
+  card.innerHTML =
+    '<div class="review-card">' +
+    '  <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">' + sizeBtn + '</div>' +
+    '  <div class="review-sentence">' + escHtml(clozeSent) + '</div>' +
+    '  <div class="review-input-row">' +
+    '    <input type="text" id="reviewAnswer" class="review-input" placeholder="Type the word..." autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\')checkAnswer()">' +
+    '    <button class="btn-primary" onclick="checkAnswer()">Check</button>' +
+    '    <button class="btn-secondary" onclick="showHint()">Hint</button>' +
+    '  </div>' +
+    '  <div id="reviewFeedback" class="review-feedback"></div>' +
+    '  <div id="reviewHint" style="display:none;" class="review-hint"></div>' +
+    '</div>';
+
+  // Wrap in overlay if expanded
+  if (reviewExpanded) {
+    const cardEl = card.firstElementChild;
+    if (cardEl) {
+      const overlay = document.createElement('div');
+      overlay.className = 'review-overlay';
+      overlay.id = 'reviewOverlay';
+      overlay.onclick = function(e) { if (e.target === this) toggleReviewSize(); };
+      document.body.appendChild(overlay);
+      overlay.appendChild(cardEl);
+    }
+  }
+
+  const inp = document.getElementById('reviewAnswer');
+  if (inp) inp.focus();
+}
+
+function toggleReviewSize() {
+  reviewExpanded = !reviewExpanded;
+  const overlay = document.getElementById('reviewOverlay');
+  if (overlay) {
+    const inner = overlay.firstElementChild;
+    if (inner && inner.parentNode) inner.remove();
+    overlay.remove();
+  }
+  showReviewCard();
+  const inp = document.getElementById('reviewAnswer');
+  if (inp) inp.focus();
+}
+
+function checkAnswer() {
+  const input = document.getElementById('reviewAnswer');
+  const feedback = document.getElementById('reviewFeedback');
+  const entry = reviewQueue[reviewIndex];
+  if (!entry || !input || input.disabled) return;
+
+  const answer = input.value.trim().toLowerCase();
+  const correct = entry.wordLower.toLowerCase();
+  const inter = SRS_INTERVALS[entry.stage] || 0;
+
+  if (answer === correct) {
+    updateStage(entry, true);
+    reviewStats.correct++;
+    feedback.innerHTML = '<span class="review-correct">✓ Correct! Stage ' + (entry.stage - 1) + ' → ' + entry.stage + ' (next in ' + SRS_INTERVALS[entry.stage] + 'd)</span>' +
+      '<button class="btn-primary" onclick="nextReview()">Next →</button>';
+    input.disabled = true;
+  } else {
+    updateStage(entry, false);
+    reviewStats.incorrect++;
+    feedback.innerHTML = '<span class="review-incorrect">✗ "' + escHtml(input.value.trim()) + '" — Answer: ' + escHtml(entry.word) + '</span>' +
+      '<button class="btn-primary" onclick="nextReview()">Next →</button>';
+    input.disabled = true;
+  }
+  // Update progress bar directly without re-rendering the card
+  const total = reviewQueue.length;
+  const done = reviewStats.correct + reviewStats.incorrect;
+  const labelEl = document.getElementById('reviewLabel');
+  const barFill = document.getElementById('reviewBarFill');
+  if (labelEl) labelEl.textContent = (reviewIndex + 1) + ' / ' + total + '  ✓' + reviewStats.correct + ' ✗' + reviewStats.incorrect;
+  if (barFill && total > 0) barFill.style.width = (done / total * 100) + '%';
+}
+
+function showHint() {
+  const hintEl = document.getElementById('reviewHint');
+  const entry = reviewQueue[reviewIndex];
+  if (!entry || !hintEl) return;
+  let html = '';
+  if (entry.hint) html += '<div class="hint-chinese">💡 ' + escHtml(entry.hint) + '</div>';
+  html += '<div class="hint-first">First letter: ' + entry.word[0] + '_'.repeat(Math.max(0, entry.word.length - 1)) + '</div>';
+  html += '<div class="hint-def" id="hintDef" style="margin-top:6px;color:var(--accent);font-size:12px;">Loading definition...</div>';
+  hintEl.innerHTML = html;
+  hintEl.style.display = 'block';
+
+  // Fetch English definition from free dictionary API
+  const defEl = document.getElementById('hintDef');
+  if (defEl && entry.word) {
+    fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(entry.word))
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        if (data && data[0] && data[0].meanings) {
+          const defs = [];
+          data[0].meanings.slice(0, 2).forEach(m => {
+            if (m.definitions && m.definitions[0]) {
+              defs.push('[' + m.partOfSpeech + '] ' + m.definitions[0].definition);
+            }
+          });
+          if (defs.length) {
+            defEl.innerHTML = '📖 ' + defs.join('<br>');
+          } else {
+            defEl.style.display = 'none';
+          }
+        } else {
+          defEl.style.display = 'none';
+        }
+      })
+      .catch(() => { defEl.style.display = 'none'; });
+  }
+}
+
+function nextReview() {
+  reviewIndex++;
+  showReviewCard();
+  const inp = document.getElementById('reviewAnswer');
+  if (inp) inp.focus();
+}
+
+// ============================================================
+// DASHBOARD — Multi-article browsing
+// ============================================================
+function showDashboard() {
+  closePopup(); closeSentenceCard();
+  saveFullArticleData();
+  ['articleContainer','pasteZone','inlineEdit'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('articleHeader').style.display = 'none';
+  const dash = document.getElementById('dashboard');
+  dash.style.display = 'block';
+  currentArticleId = null;
+
+  const store = getArticleIndex();
+  const ids = Object.keys(store).sort();
+
+  let html = '<div class="dash-header"><h1>📚 我的精读</h1><button class="btn-primary" onclick="showPasteZone()">+ 新文章</button></div>';
+
+  if (!ids.length) {
+    html += '<div class="empty-state"><p>还没有文章，点击上方按钮开始。</p></div>';
+  } else {
+    html += '<div class="dash-grid">';
+    ids.forEach(id => {
+      const info = store[id];
+      html += '<div class="dash-card" onclick="openArticle(\'' + id + '\')">' +
+        '<span class="dash-delete" onclick="event.stopPropagation();deleteArticle(\'' + id + '\')">✕</span>' +
+        '<div class="dash-source">' + escHtml(info.source || info.id) + '</div>' +
+        '<div class="dash-title">' + escHtml(info.title) + '</div>' +
+        '<div class="dash-meta">' + info.vocabCount + ' vocab · ' + info.created + '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+  }
+  dash.innerHTML = html;
+}
+
+function openArticle(id) {
+  saveFullArticleData();
+  currentArticleId = id;
+  const data = loadArticleFromStore(id);
+  if (!data) { showDashboard(); return; }
+  articleData = data.article;
+  vocabData = data.vocab || [];
+  sentenceData = data.sentences || [];
+  syntaxData = data.syntax || [];
+  sentenceNotes = data.notes || {};
+  localStorage.setItem('ielts_last_article', id);
+
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('articleContainer').style.display = 'block';
+  document.getElementById('articleHeader').style.display = 'block';
+  renderAll();
+}
+
+function deleteArticle(id) {
+  if (!confirm('Delete "' + (getArticleIndex()[id]?.title || id) + '" and all its data?')) return;
+  localStorage.removeItem(getArticleStoreKey(id));
+  const store = getArticleIndex();
+  delete store[id];
+  saveArticleIndex(store);
+  if (!Object.keys(store).length) localStorage.removeItem('ielts_last_article');
+  if (currentArticleId === id) {
+    currentArticleId = null; articleData = null;
+    vocabData = []; sentenceData = []; syntaxData = []; sentenceNotes = {};
+  }
+  showDashboard();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+loadAll();
+// Auto-seed old articles from seed_*.js files (only on first visit)
+(function() {
+  if (typeof SEED_T1 !== 'undefined') {
+    const store = getArticleIndex();
+    if (!store['ielts-11-t1']) {
+      const d = SEED_T1;
+      const id = 'ielts-11-t1';
+      store[id] = { id, title: d.article.title, source: d.article.source || '', created: '2026-05-11', modified: '2026-05-11', vocabCount: (d.vocab||[]).length, sentCount: (d.sentences||[]).length };
+      saveArticleIndex(store);
+      localStorage.setItem('ielts_article_' + id, JSON.stringify({ article: d.article, vocab: d.vocab || [], sentences: d.sentences || [], syntax: d.syntax || [], notes: d.sentenceNotes || {} }));
+    }
+  }
+  if (typeof SEED_T2 !== 'undefined') {
+    const store = getArticleIndex();
+    if (!store['ielts-11-t2']) {
+      const d = SEED_T2;
+      const id = 'ielts-11-t2';
+      store[id] = { id, title: d.article.title, source: d.article.source || '', created: '2026-05-27', modified: '2026-05-27', vocabCount: (d.vocab||[]).length, sentCount: (d.sentences||[]).length };
+      saveArticleIndex(store);
+      localStorage.setItem('ielts_article_' + id, JSON.stringify({ article: d.article, vocab: d.vocab || [], sentences: d.sentences || [], syntax: d.syntax || [], notes: d.sentenceNotes || {} }));
+    }
+  }
+  // Re-load if data was just seeded (no article was loaded initially)
+  if (!currentArticleId && Object.keys(getArticleIndex()).length) {
+    const store = getArticleIndex();
+    const lastId = Object.keys(store)[0];
+    currentArticleId = lastId;
+    const data = loadArticleFromStore(lastId);
+    if (data) {
+      articleData = data.article;
+      vocabData = data.vocab || [];
+      sentenceData = data.sentences || [];
+      syntaxData = data.syntax || [];
+      sentenceNotes = data.notes || {};
+    }
+  }
+})();
+// Auto-save on page close
+window.addEventListener('beforeunload', () => saveFullArticleData());
+if (articleData) {
+  renderAll();
+} else {
+  showDashboard();
+}
+</script>
+</body>
+</html>

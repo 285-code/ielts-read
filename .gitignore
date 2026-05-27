@@ -1,0 +1,16 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Temp
+*.tmp
+t2_compressed.json
+008b3ca9-f722-432c-841c-ce3f5e7af298.png
+
+# Claude
+.claude-memory/
