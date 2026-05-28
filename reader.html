@@ -249,6 +249,12 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-hint { margin-top: 8px; padding: 10px 14px; background: #fef9e7; border-radius: 6px; font-size: 13px; line-height: 1.7; }
 .review-hint .hint-chinese { margin-bottom: 4px; color: var(--text); }
 .review-hint .hint-first { color: var(--muted); font-size: 15px; font-weight: 700; letter-spacing: 2px; }
+/* Review word info with phonetic */
+.review-word-info { width:100%; margin-top:4px; padding-top:6px; border-top:1px solid #f0f0f0; font-size:15px; display:flex; align-items:center; gap:8px; }
+.review-word-info .word { font-weight:700; color:var(--text); }
+.review-phonetic { color:var(--muted); font-size:14px; letter-spacing:0.5px; }
+.review-speak-btn { font-size:18px; cursor:pointer; border:none; background:none; padding:2px 6px; border-radius:4px; line-height:1; }
+.review-speak-btn:hover { background:var(--accent-light); }
 .review-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
 .review-progress { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .review-progress .bar { flex: 1; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
@@ -260,6 +266,8 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-overlay .review-input { font-size: 18px; padding: 12px 16px; }
 .review-overlay .review-feedback { font-size: 16px; }
 .review-overlay .review-hint { font-size: 15px; }
+.review-overlay .review-word-info { font-size:18px; }
+.review-overlay .review-phonetic { font-size:16px; }
 .review-size-btn { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 10px; background: white; font-family: inherit; }
 .review-size-btn:hover { background: var(--accent-light); }
 /* Review skip button — top-left of review card */
@@ -1746,6 +1754,31 @@ function toggleReviewSize() {
   if (inp) inp.focus();
 }
 
+function speakWord(word) {
+  if (!window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(word);
+  u.lang = 'en-US';
+  u.rate = 0.9;
+  speechSynthesis.speak(u);
+}
+
+function speakCurrentWord() {
+  const entry = reviewQueue[reviewIndex];
+  if (entry) speakWord(entry.word);
+}
+
+function fetchPhonetic(word, callback) {
+  fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word))
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(data => {
+      if (data && data[0]) {
+        const ph = data[0].phonetic || (data[0].phonetics && data[0].phonetics.find(p => p.text)?.text) || '';
+        callback(ph);
+      } else { callback(''); }
+    })
+    .catch(() => callback(''));
+}
+
 function checkAnswer() {
   const input = document.getElementById('reviewAnswer');
   const feedback = document.getElementById('reviewFeedback');
@@ -1760,14 +1793,18 @@ function checkAnswer() {
     updateStage(entry, true);
     reviewStats.correct++;
     feedback.innerHTML = '<span class="review-correct">✓ Correct! Stage ' + (entry.stage - 1) + ' → ' + entry.stage + ' (next in ' + SRS_INTERVALS[entry.stage] + 'd)</span>' +
-      '<button class="btn-primary" onclick="nextReview()">Next →</button>';
+      '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
+      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakCurrentWord()">🔊</button></div>';
     input.disabled = true;
+    fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
   } else {
     updateStage(entry, false);
     reviewStats.incorrect++;
     feedback.innerHTML = '<span class="review-incorrect">✗ "' + escHtml(input.value.trim()) + '" — Answer: ' + escHtml(entry.word) + '</span>' +
-      '<button class="btn-primary" onclick="nextReview()">Next →</button>';
+      '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
+      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakCurrentWord()">🔊</button></div>';
     input.disabled = true;
+    fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
   }
   // Update progress bar directly without re-rendering the card
   const total = reviewQueue.length;
