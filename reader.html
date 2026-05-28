@@ -255,6 +255,11 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-phonetic { color:var(--muted); font-size:14px; letter-spacing:0.5px; }
 .review-speak-btn { font-size:18px; cursor:pointer; border:none; background:none; padding:2px 6px; border-radius:4px; line-height:1; }
 .review-speak-btn:hover { background:var(--accent-light); }
+/* Inline hint */
+.review-hint-inline { margin-bottom:10px; padding:8px 14px; background:#f8f7f4; border-radius:6px; font-size:13px; line-height:1.7; }
+.review-hint-inline .hint-chinese { color:var(--text); margin-bottom:2px; }
+.review-hint-inline .hint-first { font-size:16px; font-weight:700; letter-spacing:2px; color:var(--accent); font-family:'Courier New',monospace; }
+.review-hint-inline .hint-def { font-size:12px; color:var(--muted); margin-top:2px; }
 .review-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
 .review-progress { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .review-progress .bar { flex: 1; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
@@ -268,6 +273,8 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-overlay .review-hint { font-size: 15px; }
 .review-overlay .review-word-info { font-size:18px; }
 .review-overlay .review-phonetic { font-size:16px; }
+.review-overlay .review-hint-inline { font-size:14px; padding:12px 18px; }
+.review-overlay .review-hint-inline .hint-first { font-size:18px; }
 .review-size-btn { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 10px; background: white; font-family: inherit; }
 .review-size-btn:hover { background: var(--accent-light); }
 /* Review skip button — top-left of review card */
@@ -1682,11 +1689,13 @@ let reviewQueue = [];
 let reviewIndex = 0;
 let reviewStats = { correct: 0, incorrect: 0 };
 let reviewExpanded = false;
+let reviewRetry = false;
 
 function startReview() {
   reviewQueue = getReviewQueue();
   reviewIndex = 0;
   reviewStats = { correct: 0, incorrect: 0 };
+  reviewRetry = false;
   showReviewCard();
 }
 
@@ -1725,6 +1734,11 @@ function showReviewCard() {
   const sizeLabel = reviewExpanded ? '缩小' : '放大';
   const sizeBtn = '<button class="review-size-btn" id="reviewSizeBtn" onclick="toggleReviewSize()">' + sizeLabel + '</button>';
 
+  const pattern = entry.word[0] + '_'.repeat(Math.max(0, entry.word.length - 1));
+  const hintHtml = (entry.hint ? '<div class="hint-chinese">💡 ' + escHtml(entry.hint) + '</div>' : '') +
+    '<div class="hint-first">' + pattern + '</div>' +
+    '<div class="hint-def" id="reviewHintDef">📖 Loading definition...</div>';
+
   card.innerHTML =
     '<div class="review-card">' +
     '  <div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
@@ -1732,13 +1746,12 @@ function showReviewCard() {
     '    ' + sizeBtn +
     '  </div>' +
     '  <div class="review-sentence">' + escHtml(clozeSent) + '</div>' +
+    '  <div class="review-hint-inline">' + hintHtml + '</div>' +
     '  <div class="review-input-row">' +
-    '    <input type="text" id="reviewAnswer" class="review-input" placeholder="Type the word..." autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();checkAnswer()}">' +
+    '    <input type="text" id="reviewAnswer" class="review-input" placeholder="' + pattern + ' (type the word)" autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();checkAnswer()}">' +
     '    <button class="btn-primary" onclick="checkAnswer()">Check</button>' +
-    '    <button class="btn-secondary" onclick="showHint()">Hint</button>' +
     '  </div>' +
     '  <div id="reviewFeedback" class="review-feedback"></div>' +
-    '  <div id="reviewHint" style="display:none;" class="review-hint"></div>' +
     '</div>';
 
   // Wrap in overlay if expanded
@@ -1755,6 +1768,33 @@ function showReviewCard() {
   }
 
   // Keyboard shortcuts: Enter→next (when answered), Space→pronounce
+
+  // Auto-fetch English definition
+  fetchPhonetic(entry.word, function(ph) {
+    var defEl = document.getElementById('reviewHintDef');
+    if (defEl) defEl.textContent = ph ? '📖 ' + entry.word + '  ' + ph : '';
+  });
+  // Also try dictionary API for definition
+  if (entry.word) {
+    fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(entry.word))
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+      .then(function(data) {
+        var defEl = document.getElementById('reviewHintDef');
+        if (!defEl) return;
+        if (data && data[0] && data[0].meanings) {
+          var defs = [];
+          data[0].meanings.slice(0, 2).forEach(function(m) {
+            if (m.definitions && m.definitions[0]) {
+              defs.push('[' + m.partOfSpeech + '] ' + m.definitions[0].definition);
+            }
+          });
+          defEl.textContent = defs.length ? '📖 ' + defs.join('; ') : '';
+        } else {
+          defEl.textContent = '';
+        }
+      })
+      .catch(function(){ var defEl = document.getElementById('reviewHintDef'); if (defEl) defEl.textContent = ''; });
+  }
 
   const inp = document.getElementById('reviewAnswer');
   if (inp) inp.focus();
@@ -1817,32 +1857,50 @@ function checkAnswer() {
   const input = document.getElementById('reviewAnswer');
   const feedback = document.getElementById('reviewFeedback');
   const entry = reviewQueue[reviewIndex];
-  if (!entry || !input || input.disabled) return;
+  if (!entry || !input) return;
 
   const answer = input.value.trim().toLowerCase();
   const correct = entry.wordLower.toLowerCase();
-  const inter = SRS_INTERVALS[entry.stage] || 0;
 
   if (answer === correct) {
-    updateStage(entry, true);
-    reviewStats.correct++;
-    feedback.innerHTML = '<span class="review-correct">✓ Correct! Stage ' + (entry.stage - 1) + ' → ' + entry.stage + ' (next in ' + SRS_INTERVALS[entry.stage] + 'd)</span>' +
-      '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
-      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
-    input.disabled = true;
-    fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
-    setTimeout(function(){ speakWord(entry.word); }, 100);
+    if (reviewRetry) {
+      // Got it right on retry — proceed without extra stage change
+      reviewRetry = false;
+      feedback.innerHTML = '<span class="review-correct">✓ Correct! You got it.</span>' +
+        '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
+        '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">' + (window._lastPhonetic || '') + '</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
+      input.disabled = true;
+      setTimeout(function(){ speakWord(entry.word); }, 100);
+    } else {
+      updateStage(entry, true);
+      reviewStats.correct++;
+      feedback.innerHTML = '<span class="review-correct">✓ Correct! Stage ' + (entry.stage - 1) + ' → ' + entry.stage + ' (next in ' + SRS_INTERVALS[entry.stage] + 'd)</span>' +
+        '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
+        '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
+      input.disabled = true;
+      fetchPhonetic(entry.word, function(ph) {
+        window._lastPhonetic = ph || '';
+        var el = document.getElementById('reviewPhonetic');
+        if (el) el.textContent = ph || '';
+      });
+      setTimeout(function(){ speakWord(entry.word); }, 100);
+    }
   } else {
-    updateStage(entry, false);
-    reviewStats.incorrect++;
-    feedback.innerHTML = '<span class="review-incorrect">✗ "' + escHtml(input.value.trim()) + '" — Answer: ' + escHtml(entry.word) + '</span>' +
-      '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
-      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
-    input.disabled = true;
-    fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
+    if (!reviewRetry) {
+      // First wrong attempt — decrease stage, show answer, start retry
+      updateStage(entry, false);
+      reviewStats.incorrect++;
+      reviewRetry = true;
+      fetchPhonetic(entry.word, function(ph) { window._lastPhonetic = ph || ''; });
+    }
+    input.value = '';
+    input.placeholder = '✏️ Type the correct answer...';
+    input.focus();
+    feedback.innerHTML = '<span class="review-incorrect">✗ Wrong! Correct answer: ' + escHtml(entry.word) + '</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button>' +
+      '<div style="width:100%;font-size:12px;color:var(--muted);">Type the correct answer above, then press Enter.</div>';
     setTimeout(function(){ speakWord(entry.word); }, 100);
   }
-  // Update progress bar directly without re-rendering the card
+  // Update progress bar
   const total = reviewQueue.length;
   const done = reviewStats.correct + reviewStats.incorrect;
   const labelEl = document.getElementById('reviewLabel');
@@ -1851,45 +1909,10 @@ function checkAnswer() {
   if (barFill && total > 0) barFill.style.width = (done / total * 100) + '%';
 }
 
-function showHint() {
-  const hintEl = document.getElementById('reviewHint');
-  const entry = reviewQueue[reviewIndex];
-  if (!entry || !hintEl) return;
-  let html = '';
-  if (entry.hint) html += '<div class="hint-chinese">💡 ' + escHtml(entry.hint) + '</div>';
-  html += '<div class="hint-first">First letter: ' + entry.word[0] + '_'.repeat(Math.max(0, entry.word.length - 1)) + '</div>';
-  html += '<div class="hint-def" id="hintDef" style="margin-top:6px;color:var(--accent);font-size:12px;">Loading definition...</div>';
-  hintEl.innerHTML = html;
-  hintEl.style.display = 'block';
-
-  // Fetch English definition from free dictionary API
-  const defEl = document.getElementById('hintDef');
-  if (defEl && entry.word) {
-    fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(entry.word))
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
-        if (data && data[0] && data[0].meanings) {
-          const defs = [];
-          data[0].meanings.slice(0, 2).forEach(m => {
-            if (m.definitions && m.definitions[0]) {
-              defs.push('[' + m.partOfSpeech + '] ' + m.definitions[0].definition);
-            }
-          });
-          if (defs.length) {
-            defEl.innerHTML = '📖 ' + defs.join('<br>');
-          } else {
-            defEl.style.display = 'none';
-          }
-        } else {
-          defEl.style.display = 'none';
-        }
-      })
-      .catch(() => { defEl.style.display = 'none'; });
-  }
-}
 
 function nextReview() {
   reviewIndex++;
+  reviewRetry = false;
   showReviewCard();
   const inp = document.getElementById('reviewAnswer');
   if (inp) inp.focus();
