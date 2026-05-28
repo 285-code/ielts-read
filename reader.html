@@ -1756,11 +1756,22 @@ function toggleReviewSize() {
 
 function speakWord(word) {
   if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  // Pre-load voices (Chrome needs this to work)
+  const voices = window.speechSynthesis.getVoices();
   const u = new SpeechSynthesisUtterance(word);
   u.lang = 'en-US';
   u.rate = 0.9;
-  speechSynthesis.speak(u);
+  if (voices.length) {
+    const enVoice = voices.find(v => v.lang && v.lang.startsWith('en'));
+    if (enVoice) u.voice = enVoice;
+  }
+  // Keep reference to prevent garbage collection in Chrome
+  window._speechUtterance = u;
+  window.speechSynthesis.speak(u);
 }
+// Pre-trigger voice loading for Chrome
+if (window.speechSynthesis) speechSynthesis.getVoices();
 
 function speakCurrentWord() {
   const entry = reviewQueue[reviewIndex];
