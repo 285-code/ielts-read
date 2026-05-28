@@ -260,11 +260,11 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-overlay .review-input { font-size: 18px; padding: 12px 16px; }
 .review-overlay .review-feedback { font-size: 16px; }
 .review-overlay .review-hint { font-size: 15px; }
-.review-size-btn { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 10px; background: white; font-family: inherit; margin-left: 8px; }
+.review-size-btn { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 10px; background: white; font-family: inherit; }
 .review-size-btn:hover { background: var(--accent-light); }
-#reviewSizeBtn { float: right; }
-
-/* Vocab sort bar */
+/* Review skip button — top-left of review card */
+.review-skip-btn { font-size:10px; padding:1px 6px; border:1px solid #eee; border-radius:3px; background:transparent; cursor:pointer; font-family:inherit; color:#ccc; }
+.review-skip-btn:hover { background:#fef0f0; color:var(--red); border-color:var(--red); }
 .vocab-sort-bar { display:flex; gap:4px; margin-bottom:10px; }
 .vocab-sort-bar button { flex:1; padding:4px; border:1px solid var(--border); border-radius:4px; font-size:11px; cursor:pointer; background:white; font-family:inherit; }
 .vocab-sort-bar button.active { background:var(--accent); color:white; border-color:var(--accent); }
@@ -286,9 +286,6 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .vocab-suspend-btn:hover { background:#f0f0f0; color:var(--red); border-color:var(--red); }
 .vocab-suspend-btn.restore { color:var(--accent); border-color:var(--accent); }
 .vocab-suspend-btn.restore:hover { background:var(--accent-light); }
-/* Review skip button */
-.review-skip-btn { font-size:11px; padding:2px 10px; border:1px solid #ddd; border-radius:4px; background:white; cursor:pointer; font-family:inherit; color:#999; margin-left:auto; }
-.review-skip-btn:hover { background:#fef0f0; color:var(--red); border-color:var(--red); }
 </style>
 <script src="seed_t1.js"></script>
 <script src="seed_t2.js"></script>
@@ -1705,13 +1702,15 @@ function showReviewCard() {
 
   card.innerHTML =
     '<div class="review-card">' +
-    '  <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">' + sizeBtn + '</div>' +
+    '  <div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
+    '    <button class="review-skip-btn" onclick="skipReviewWord()">不再复习</button>' +
+    '    ' + sizeBtn +
+    '  </div>' +
     '  <div class="review-sentence">' + escHtml(clozeSent) + '</div>' +
     '  <div class="review-input-row">' +
     '    <input type="text" id="reviewAnswer" class="review-input" placeholder="Type the word..." autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\')checkAnswer()">' +
     '    <button class="btn-primary" onclick="checkAnswer()">Check</button>' +
     '    <button class="btn-secondary" onclick="showHint()">Hint</button>' +
-    '    <button class="review-skip-btn" onclick="skipReviewWord()">不再复习</button>' +
     '  </div>' +
     '  <div id="reviewFeedback" class="review-feedback"></div>' +
     '  <div id="reviewHint" style="display:none;" class="review-hint"></div>' +
