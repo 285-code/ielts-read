@@ -260,6 +260,12 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-hint-inline .hint-chinese { color:var(--text); margin-bottom:2px; }
 .review-hint-inline .hint-first { font-size:16px; font-weight:700; letter-spacing:2px; color:var(--accent); font-family:'Courier New',monospace; }
 .review-hint-inline .hint-def { font-size:12px; color:var(--muted); margin-top:2px; }
+/* Letter boxes */
+.letter-box-container { position:relative; flex:1; display:flex; align-items:center; }
+.letter-boxes { display:flex; gap:3px; align-items:center; }
+.lbox { display:inline-flex; align-items:center; justify-content:center; width:1.3em; height:1.6em; border-bottom:2px solid #ccc; font-size:18px; font-weight:700; font-family:'Courier New',monospace; color:var(--text); transition:all 0.1s; }
+.lbox.filled { border-color:var(--accent); color:var(--accent); }
+.letter-box-input { position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:text; z-index:1; }
 .review-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
 .review-progress { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .review-progress .bar { flex: 1; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
@@ -274,7 +280,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-overlay .review-word-info { font-size:18px; }
 .review-overlay .review-phonetic { font-size:16px; }
 .review-overlay .review-hint-inline { font-size:14px; padding:12px 18px; }
-.review-overlay .review-hint-inline .hint-first { font-size:18px; }
+.review-overlay .lbox { font-size:22px; height:2em; width:1.4em; border-bottom-width:3px; }
 .review-size-btn { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 10px; background: white; font-family: inherit; }
 .review-size-btn:hover { background: var(--accent-light); }
 /* Review skip button — top-left of review card */
@@ -1734,10 +1740,31 @@ function showReviewCard() {
   const sizeLabel = reviewExpanded ? '缩小' : '放大';
   const sizeBtn = '<button class="review-size-btn" id="reviewSizeBtn" onclick="toggleReviewSize()">' + sizeLabel + '</button>';
 
-  const pattern = entry.word[0] + '_'.repeat(Math.max(0, entry.word.length - 1));
-  const hintHtml = (entry.hint ? '<div class="hint-chinese">💡 ' + escHtml(entry.hint) + '</div>' : '') +
-    '<div class="hint-first">' + pattern + '</div>' +
-    '<div class="hint-def" id="reviewHintDef">📖 Loading definition...</div>';
+  // Build letter boxes
+  var isPhrase = entry.word.indexOf(' ') !== -1;
+  var boxesHtml = '';
+  if (isPhrase) {
+    // Multi-word phrase: use regular input with pattern placeholder
+    var pattern = entry.word[0] + '_'.repeat(Math.max(0, entry.word.length - 1));
+    boxesHtml = '<input type="text" id="reviewAnswer" class="review-input" placeholder="' + pattern + '" autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();checkAnswer()}">';
+  } else {
+    // Single word: letter boxes
+    boxesHtml = '<div id="letterBoxContainer" class="letter-box-container">' +
+      '  <div id="letterBoxes" class="letter-boxes">';
+    for (var i = 0; i < entry.word.length; i++) {
+      boxesHtml += '<span class="lbox" data-idx="' + i + '">_</span>';
+    }
+    boxesHtml += '  </div>' +
+      '  <input type="text" id="reviewAnswer" class="letter-box-input" autocomplete="off" spellcheck="false" maxlength="' + entry.word.length + '"' +
+      '    onkeydown="if(event.key===\'Enter\'){event.stopPropagation();checkAnswer()}else if(event.key===\'Backspace\'){setTimeout(syncLetterBoxes,0)}"' +
+      '    oninput="syncLetterBoxes()">' +
+      '</div>';
+  }
+
+  // Hint below input: Chinese meaning + English def (no letter pattern)
+  var hintHtml = '<div class="review-hint-inline">';
+  if (entry.hint) hintHtml += '<div class="hint-chinese">💡 ' + escHtml(entry.hint) + '</div>';
+  hintHtml += '<div class="hint-def" id="reviewHintDef">📖 Loading definition...</div></div>';
 
   card.innerHTML =
     '<div class="review-card">' +
@@ -1746,11 +1773,12 @@ function showReviewCard() {
     '    ' + sizeBtn +
     '  </div>' +
     '  <div class="review-sentence">' + escHtml(clozeSent) + '</div>' +
-    '  <div class="review-hint-inline">' + hintHtml + '</div>' +
     '  <div class="review-input-row">' +
-    '    <input type="text" id="reviewAnswer" class="review-input" placeholder="' + pattern + ' (type the word)" autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();checkAnswer()}">' +
+    '    ' + boxesHtml +
     '    <button class="btn-primary" onclick="checkAnswer()">Check</button>' +
     '  </div>' +
+    // Hint below input row
+    hintHtml +
     '  <div id="reviewFeedback" class="review-feedback"></div>' +
     '</div>';
 
@@ -1853,6 +1881,24 @@ function fetchPhonetic(word, callback) {
     .catch(() => callback(''));
 }
 
+function syncLetterBoxes() {
+  var input = document.getElementById('reviewAnswer');
+  var boxes = document.querySelectorAll('#letterBoxes .lbox');
+  if (!input || !boxes.length) return;
+  // Cap input length to box count
+  if (input.value.length > boxes.length) input.value = input.value.substring(0, boxes.length);
+  var val = input.value;
+  for (var i = 0; i < boxes.length; i++) {
+    if (i < val.length) {
+      boxes[i].textContent = val[i];
+      boxes[i].className = 'lbox filled';
+    } else {
+      boxes[i].textContent = '_';
+      boxes[i].className = 'lbox';
+    }
+  }
+}
+
 function checkAnswer() {
   const input = document.getElementById('reviewAnswer');
   const feedback = document.getElementById('reviewFeedback');
@@ -1894,7 +1940,8 @@ function checkAnswer() {
       fetchPhonetic(entry.word, function(ph) { window._lastPhonetic = ph || ''; });
     }
     input.value = '';
-    input.placeholder = '✏️ Type the correct answer...';
+    setTimeout(syncLetterBoxes, 0);
+    if (input.className === 'review-input') input.placeholder = '✏️ Type the correct answer...';
     input.focus();
     feedback.innerHTML = '<span class="review-incorrect">✗ Wrong! Correct answer: ' + escHtml(entry.word) + '</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button>' +
       '<div style="width:100%;font-size:12px;color:var(--muted);">Type the correct answer above, then press Enter.</div>';
