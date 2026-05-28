@@ -263,6 +263,32 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .review-size-btn { font-size: 11px; color: var(--accent); cursor: pointer; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 10px; background: white; font-family: inherit; margin-left: 8px; }
 .review-size-btn:hover { background: var(--accent-light); }
 #reviewSizeBtn { float: right; }
+
+/* Vocab sort bar */
+.vocab-sort-bar { display:flex; gap:4px; margin-bottom:10px; }
+.vocab-sort-bar button { flex:1; padding:4px; border:1px solid var(--border); border-radius:4px; font-size:11px; cursor:pointer; background:white; font-family:inherit; }
+.vocab-sort-bar button.active { background:var(--accent); color:white; border-color:var(--accent); }
+.vocab-sort-bar button:hover:not(.active) { background:var(--accent-light); }
+/* Stage badge */
+.vocab-stage { font-size:10px; padding:1px 6px; border-radius:8px; background:#eee; color:#666; flex-shrink:0; }
+.vocab-stage.s0 { background:#fce4e4; color:#c62828; }
+.vocab-stage.s1 { background:#ffe0b2; color:#e65100; }
+.vocab-stage.s2 { background:#fff9c4; color:#f57f17; }
+.vocab-stage.s3 { background:#c8e6c9; color:#2e7d32; }
+.vocab-stage.s4 { background:#b3e5fc; color:#01579b; }
+.vocab-stage.s5 { background:#e1bee7; color:#6a1b9a; }
+/* Suspended item */
+.vocab-list-item.suspended { opacity:0.45; }
+.vocab-list-item.suspended .word { text-decoration:line-through; }
+/* Vocab actions row */
+.vocab-actions { display:flex; gap:4px; margin-left:auto; flex-shrink:0; }
+.vocab-suspend-btn { font-size:10px; padding:1px 8px; border:1px solid #ddd; border-radius:4px; background:white; cursor:pointer; font-family:inherit; color:#999; }
+.vocab-suspend-btn:hover { background:#f0f0f0; color:var(--red); border-color:var(--red); }
+.vocab-suspend-btn.restore { color:var(--accent); border-color:var(--accent); }
+.vocab-suspend-btn.restore:hover { background:var(--accent-light); }
+/* Review skip button */
+.review-skip-btn { font-size:11px; padding:2px 10px; border:1px solid #ddd; border-radius:4px; background:white; cursor:pointer; font-family:inherit; color:#999; margin-left:auto; }
+.review-skip-btn:hover { background:#fef0f0; color:var(--red); border-color:var(--red); }
 </style>
 <script src="seed_t1.js"></script>
 <script src="seed_t2.js"></script>
@@ -332,10 +358,14 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
     <!-- Tab: Vocabulary -->
     <div id="tab-vocab" class="tab-content">
       <h3>Marked Vocabulary</h3>
-      <div id="vocab-filter" style="margin-bottom:12px;display:flex;gap:4px;">
+      <div id="vocab-filter" style="margin-bottom:6px;display:flex;gap:4px;">
         <button class="filter-btn active" data-filter="all" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;background:var(--accent);color:white;font-family:inherit;">All</button>
         <button class="filter-btn" data-filter="red" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;background:white;font-family:inherit;">🔴</button>
         <button class="filter-btn" data-filter="yellow" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;background:white;font-family:inherit;">🟡</button>
+      </div>
+      <div class="vocab-sort-bar">
+        <button class="active" data-sort="difficulty" onclick="setVocabSort('difficulty')">陌生优先</button>
+        <button data-sort="order" onclick="setVocabSort('order')">文中顺序</button>
       </div>
       <div id="vocab-list"><div class="vocab-empty">No vocabulary marked yet.</div></div>
     </div>
@@ -1233,18 +1263,86 @@ function saveSentence() {
 // VOCABULARY LIST
 // ============================================================
 let vocabFilter = 'all';
+let vocabSort = 'difficulty';
+
+function setVocabSort(mode) {
+  vocabSort = mode;
+  document.querySelectorAll('.vocab-sort-bar button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.vocab-sort-bar button[data-sort="${mode}"]`).classList.add('active');
+  renderVocab();
+}
+
+function toggleSuspend(wordLower) {
+  vocabData.forEach(v => {
+    if (v.wordLower === wordLower) v.suspended = !v.suspended;
+  });
+  saveVocab();
+  renderVocab();
+}
+
+function isSuspended(wordLower) {
+  return vocabData.some(v => v.wordLower === wordLower && v.suspended);
+}
+
+function groupPos(wl) {
+  // Find earliest article position for a word group
+  let minPara = 999, minSent = 999, minWord = 999;
+  vocabData.forEach(v => {
+    if (v.wordLower !== wl) return;
+    const m = v.sentenceId && v.sentenceId.match(/p(\d+)-s(\d+)/);
+    if (!m) return;
+    const p = parseInt(m[1]), s = parseInt(m[2]), w = v.wordIndices ? v.wordIndices[0] : 0;
+    if (p < minPara || (p === minPara && s < minSent) || (p === minPara && s === minSent && w < minWord)) {
+      minPara = p; minSent = s; minWord = w;
+    }
+  });
+  return { para: minPara, sent: minSent, word: minWord };
+}
+
 function renderVocab() {
   const list = document.getElementById('vocab-list');
   let filtered = vocabFilter === 'all' ? vocabData : vocabData.filter(v => v.level === vocabFilter);
   const grouped = {};
   filtered.forEach(v => { const k = v.wordLower; if (!grouped[k]) grouped[k] = []; grouped[k].push(v); });
-  const sorted = Object.entries(grouped).sort((a,b) => Math.min(...a[1].map(v=>({red:0,yellow:1})[v.level]??1)) - Math.min(...b[1].map(v=>({red:0,yellow:1})[v.level]??1)));
-  if (!sorted.length) { list.innerHTML = '<div class="vocab-empty">No vocabulary marked yet.</div>'; return; }
+  const entries = Object.entries(grouped);
+  if (!entries.length) { list.innerHTML = '<div class="vocab-empty">No vocabulary marked yet.</div>'; return; }
+
+  let sorted;
+  if (vocabSort === 'order') {
+    sorted = entries.sort((a, b) => {
+      const pa = groupPos(a[0]), pb = groupPos(b[0]);
+      return pa.para - pb.para || pa.sent - pb.sent || pa.word - pb.word;
+    });
+  } else {
+    // difficulty: min stage asc, then red before yellow
+    sorted = entries.sort((a, b) => {
+      const sa = Math.min(...a[1].map(v => ensureStage(v).stage));
+      const sb = Math.min(...b[1].map(v => ensureStage(v).stage));
+      if (sa !== sb) return sa - sb;
+      const la = Math.min(...a[1].map(v => ({red:0,yellow:1})[v.level] ?? 1));
+      const lb = Math.min(...b[1].map(v => ({red:0,yellow:1})[v.level] ?? 1));
+      return la - lb;
+    });
+  }
+
   list.innerHTML = sorted.map(([wl,entries]) => {
-    const e = entries[0]; const label = {red:'🔴',yellow:'🟡'}[e.level];
+    const e = entries[0];
+    const label = {red:'🔴',yellow:'🟡'}[e.level];
     const hint = e.hint ? ` <span style="color:#888;font-size:12px;">${escHtml(e.hint)}</span>` : '';
     const ctx = [...new Set(entries.map(x=>x.sentText))].slice(0,1)[0]||'';
-    return `<div class="vocab-list-item" onclick="scrollToSent('${e.sentenceId}')"><span class="level-dot ${e.level}"></span><span class="word">${label} ${e.word}${hint}</span><span class="context">${escHtml(ctx)}</span></div>`;
+    const stage = Math.min(...entries.map(v => ensureStage(v).stage));
+    const suspended = isSuspended(wl);
+    const suspendLabel = suspended ? '恢复' : '停止';
+    const suspendCls = suspended ? 'restore' : '';
+    return `<div class="vocab-list-item${suspended ? ' suspended' : ''}" onclick="scrollToSent('${e.sentenceId}')">
+      <span class="level-dot ${e.level}"></span>
+      <span class="vocab-stage s${stage}">S${stage}</span>
+      <span class="word">${label} ${e.word}${hint}</span>
+      <span class="context">${escHtml(ctx)}</span>
+      <span class="vocab-actions">
+        <span class="vocab-suspend-btn ${suspendCls}" onclick="event.stopPropagation();toggleSuspend('${wl}')">${suspendLabel}</span>
+      </span>
+    </div>`;
   }).join('');
 }
 
@@ -1279,6 +1377,7 @@ document.querySelectorAll('.panel-tabs button').forEach(btn => {
     document.getElementById('tab-vocab').style.display = tab === 'vocab' ? 'block' : 'none';
     document.getElementById('tab-sentences').style.display = tab === 'sentences' ? 'block' : 'none';
     document.getElementById('tab-review').style.display = tab === 'review' ? 'block' : 'none';
+    if (tab === 'vocab') renderVocab();
     if (tab === 'sentences') renderSentences();
     if (tab === 'review') startReview();
   });
@@ -1506,7 +1605,7 @@ function getReviewQueue() {
     const k = v.wordLower + '|' + v.sentenceId;
     if (seen.has(k)) return;
     seen.add(k);
-    if (!v.word) return;
+    if (!v.word || v.suspended) return;
     const daysSince = daysBetween(v.reviewedDate, today);
     if (daysSince >= SRS_INTERVALS[v.stage]) {
       queue.push(v);
@@ -1612,6 +1711,7 @@ function showReviewCard() {
     '    <input type="text" id="reviewAnswer" class="review-input" placeholder="Type the word..." autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\')checkAnswer()">' +
     '    <button class="btn-primary" onclick="checkAnswer()">Check</button>' +
     '    <button class="btn-secondary" onclick="showHint()">Hint</button>' +
+    '    <button class="review-skip-btn" onclick="skipReviewWord()">不再复习</button>' +
     '  </div>' +
     '  <div id="reviewFeedback" class="review-feedback"></div>' +
     '  <div id="reviewHint" style="display:none;" class="review-hint"></div>' +
@@ -1721,6 +1821,17 @@ function nextReview() {
   showReviewCard();
   const inp = document.getElementById('reviewAnswer');
   if (inp) inp.focus();
+}
+
+function skipReviewWord() {
+  const entry = reviewQueue[reviewIndex];
+  if (entry) {
+    vocabData.forEach(v => {
+      if (v.wordLower === entry.wordLower) v.suspended = true;
+    });
+    saveVocab();
+  }
+  nextReview();
 }
 
 // ============================================================
