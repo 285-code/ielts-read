@@ -1812,6 +1812,7 @@ function checkAnswer() {
       '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
     input.disabled = true;
     fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
+    setTimeout(function(){ speakWord(entry.word); }, 100);
   } else {
     updateStage(entry, false);
     reviewStats.incorrect++;
@@ -1820,6 +1821,7 @@ function checkAnswer() {
       '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
     input.disabled = true;
     fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
+    setTimeout(function(){ speakWord(entry.word); }, 100);
   }
   // Update progress bar directly without re-rendering the card
   const total = reviewQueue.length;
