@@ -1716,7 +1716,7 @@ function showReviewCard() {
     '  </div>' +
     '  <div class="review-sentence">' + escHtml(clozeSent) + '</div>' +
     '  <div class="review-input-row">' +
-    '    <input type="text" id="reviewAnswer" class="review-input" placeholder="Type the word..." autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\')checkAnswer()">' +
+    '    <input type="text" id="reviewAnswer" class="review-input" placeholder="Type the word..." autocomplete="off" spellcheck="false" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();checkAnswer()}">' +
     '    <button class="btn-primary" onclick="checkAnswer()">Check</button>' +
     '    <button class="btn-secondary" onclick="showHint()">Hint</button>' +
     '  </div>' +
@@ -1737,11 +1737,30 @@ function showReviewCard() {
     }
   }
 
+  // Keyboard shortcuts: Enter→next (when answered), Space→pronounce
+  card.tabIndex = -1;
+  card.style.outline = 'none';
+  card.onkeydown = function(e) {
+    const inp = document.getElementById('reviewAnswer');
+    if (e.key === 'Enter') {
+      if (inp && !inp.disabled) return;
+      e.preventDefault();
+      nextReview();
+      return;
+    }
+    if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Space') {
+      if (inp && inp.disabled) {
+        e.preventDefault();
+        const entry = reviewQueue[reviewIndex];
+        if (entry) speakWord(entry.word);
+      }
+    }
+  };
+  setTimeout(function(){ card.focus(); }, 50);
+
   const inp = document.getElementById('reviewAnswer');
   if (inp) inp.focus();
 }
-
-function toggleReviewSize() {
   reviewExpanded = !reviewExpanded;
   const overlay = document.getElementById('reviewOverlay');
   if (overlay) {
