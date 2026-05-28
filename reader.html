@@ -1388,6 +1388,23 @@ document.querySelectorAll('.panel-tabs button').forEach(btn => {
   });
 });
 
+// Global keyboard shortcuts for review
+document.addEventListener('keydown', function(e) {
+  var tab = document.querySelector('.panel-tabs button.active');
+  if (!tab || tab.dataset.tab !== 'review') return;
+  var inp = document.getElementById('reviewAnswer');
+  if (!inp) return;
+  if (e.key === 'Enter') {
+    if (inp.disabled) { e.preventDefault(); nextReview(); }
+    return;
+  }
+  if ((e.key === ' ' || e.key === 'Spacebar') && inp.disabled) {
+    e.preventDefault();
+    var entry = reviewQueue[reviewIndex];
+    if (entry) speakWord(entry.word);
+  }
+});
+
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => { b.style.background='white'; b.style.color='var(--text)'; });
@@ -1738,25 +1755,6 @@ function showReviewCard() {
   }
 
   // Keyboard shortcuts: Enter→next (when answered), Space→pronounce
-  card.tabIndex = -1;
-  card.style.outline = 'none';
-  card.onkeydown = function(e) {
-    const inp = document.getElementById('reviewAnswer');
-    if (e.key === 'Enter') {
-      if (inp && !inp.disabled) return;
-      e.preventDefault();
-      nextReview();
-      return;
-    }
-    if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Space') {
-      if (inp && inp.disabled) {
-        e.preventDefault();
-        const entry = reviewQueue[reviewIndex];
-        if (entry) speakWord(entry.word);
-      }
-    }
-  };
-  setTimeout(function(){ card.focus(); }, 50);
 
   const inp = document.getElementById('reviewAnswer');
   if (inp) inp.focus();
