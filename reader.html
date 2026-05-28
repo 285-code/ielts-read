@@ -1757,25 +1757,29 @@ function toggleReviewSize() {
 function speakWord(word) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  // Pre-load voices (Chrome needs this to work)
-  const voices = window.speechSynthesis.getVoices();
   const u = new SpeechSynthesisUtterance(word);
   u.lang = 'en-US';
   u.rate = 0.9;
-  if (voices.length) {
-    const enVoice = voices.find(v => v.lang && v.lang.startsWith('en'));
-    if (enVoice) u.voice = enVoice;
-  }
-  // Keep reference to prevent garbage collection in Chrome
-  window._speechUtterance = u;
+  u.volume = 1;
+  // Chrome fix: onstart/onend keep GC from collecting the utterance
+  u.onstart = function(){};
+  u.onend = function(){};
+  u.onerror = function(e){ console.error('speak error:', e); };
+  const voices = window.speechSynthesis.getVoices();
+  const enVoice = voices.find(v => v.lang && (v.lang === 'en-US' || v.lang.startsWith('en')));
+  if (enVoice) u.voice = enVoice;
   window.speechSynthesis.speak(u);
 }
-// Pre-trigger voice loading for Chrome
-if (window.speechSynthesis) speechSynthesis.getVoices();
+// Chrome fix: ensure voices are loaded
+if (window.speechSynthesis) {
+  if (speechSynthesis.getVoices().length === 0) {
+    speechSynthesis.onvoiceschanged = function(){ speechSynthesis.onvoiceschanged = null; };
+  }
+}
 
-function speakCurrentWord() {
-  const entry = reviewQueue[reviewIndex];
-  if (entry) speakWord(entry.word);
+function speakFromBtn(btn) {
+  var w = btn.getAttribute('data-word');
+  if (w) speakWord(w);
 }
 
 function fetchPhonetic(word, callback) {
@@ -1805,7 +1809,7 @@ function checkAnswer() {
     reviewStats.correct++;
     feedback.innerHTML = '<span class="review-correct">✓ Correct! Stage ' + (entry.stage - 1) + ' → ' + entry.stage + ' (next in ' + SRS_INTERVALS[entry.stage] + 'd)</span>' +
       '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
-      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakCurrentWord()">🔊</button></div>';
+      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
     input.disabled = true;
     fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
   } else {
@@ -1813,7 +1817,7 @@ function checkAnswer() {
     reviewStats.incorrect++;
     feedback.innerHTML = '<span class="review-incorrect">✗ "' + escHtml(input.value.trim()) + '" — Answer: ' + escHtml(entry.word) + '</span>' +
       '<button class="btn-primary" onclick="nextReview()">Next →</button>' +
-      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakCurrentWord()">🔊</button></div>';
+      '<div class="review-word-info"><span class="word">' + escHtml(entry.word) + '</span> <span class="review-phonetic" id="reviewPhonetic">loading...</span> <button class="review-speak-btn" onclick="speakFromBtn(this)" data-word="' + entry.word.replace(/"/g, '&quot;') + '">🔊</button></div>';
     input.disabled = true;
     fetchPhonetic(entry.word, ph => { const el = document.getElementById('reviewPhonetic'); if (el) el.textContent = ph || ''; });
   }
