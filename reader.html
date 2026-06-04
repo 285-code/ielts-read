@@ -2292,6 +2292,13 @@ if (articleData) {
 } else {
   showDashboard();
 }
+// Auto-pull on load if auto-sync is enabled
+setTimeout(function() {
+  var cb = document.getElementById('autoSyncCheck');
+  if (cb && cb.checked && getGithubToken()) {
+    pullFromGithub();
+  }
+}, 500);
 </script>
 </body>
 </html>
