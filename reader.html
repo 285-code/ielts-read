@@ -1684,10 +1684,25 @@ function pushToGithub() {
 
 function pullFromGithub() {
   setSyncStatus('pulling...', 'busy');
-  fetch('https://raw.githubusercontent.com/' + SYNC_OWNER + '/' + SYNC_REPO + '/' + SYNC_BRANCH + '/' + SYNC_PATH)
+  var token = getGithubToken();
+  var url = token
+    ? 'https://api.github.com/repos/' + SYNC_OWNER + '/' + SYNC_REPO + '/contents/' + SYNC_PATH
+    : 'https://raw.githubusercontent.com/' + SYNC_OWNER + '/' + SYNC_REPO + '/' + SYNC_BRANCH + '/' + SYNC_PATH;
+  var opts = { headers: {} };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  fetch(url, opts)
   .then(function(r) {
+    if (r.status === 404) { setSyncStatus('no sync data yet — push from your other device first', 'err'); return null; }
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+    if (token) {
+      // API returns base64-encoded content
+      return r.json().then(function(j) {
+        if (!j || !j.content) throw new Error('invalid response');
+        return JSON.parse(decodeURIComponent(escape(atob(j.content))));
+      });
+    } else {
+      return r.json();
+    }
   })
   .then(function(data) {
     if (!data || !data.index) { throw new Error('invalid sync data'); }
@@ -2296,7 +2311,21 @@ if (articleData) {
 setTimeout(function() {
   var cb = document.getElementById('autoSyncCheck');
   if (cb && cb.checked && getGithubToken()) {
-    pullFromGithub();
+    var t = getGithubToken();
+    fetch('https://api.github.com/repos/' + SYNC_OWNER + '/' + SYNC_REPO + '/contents/' + SYNC_PATH, {
+      headers: { 'Authorization': 'Bearer ' + t }
+    })
+      .then(function(r) {
+        if (r.status === 404) return null;
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then(function(j) {
+        if (!j || !j.content) return;
+        var data = JSON.parse(decodeURIComponent(escape(atob(j.content))));
+        if (data && data.index) { mergeSyncData(data); location.reload(); }
+      })
+      .catch(function() {});
   }
 }, 500);
 </script>
