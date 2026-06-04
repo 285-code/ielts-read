@@ -1734,46 +1734,29 @@ function mergeSyncData(data) {
   }
 }
 
-var _autoSyncTimer = null;
-var _lastSyncData = '';
+var _lastSyncDigest = '';
 function getSyncDigest() {
   var idx = localStorage.getItem('ielts_index') || '{}';
   var last = localStorage.getItem('ielts_last_article') || '';
   return idx.length + '|' + last;
 }
 
-function scheduleAutoSync() {
-  var cb = document.getElementById('autoSyncCheck');
-  if (!cb || !cb.checked) return;
-  if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
-  // Push every 5 min if data changed
-  _autoSyncTimer = setTimeout(function() {
-    var d = getSyncDigest();
-    if (d !== _lastSyncData) {
-      _lastSyncData = d;
-      pushToGithub();
-    }
-    scheduleAutoSync();  // schedule next check
-  }, 1800000);
-}
-
 function toggleAutoSync() {
   var cb = document.getElementById('autoSyncCheck');
   localStorage.setItem('ielts_auto_sync', cb.checked ? '1' : '0');
-  if (cb.checked) {
-    _lastSyncData = getSyncDigest();
-    scheduleAutoSync();
-  } else {
-    if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
-  }
 }
 
-// Wire auto-sync into save
-var _origSave = saveFullArticleData;
-saveFullArticleData = function() {
-  _origSave();
-  scheduleAutoSync();
-};
+// On page close: push to GitHub if auto-sync is on
+function syncOnClose() {
+  var cb = document.getElementById('autoSyncCheck');
+  if (!cb || !cb.checked) return;
+  if (!getGithubToken()) return;
+  var d = getSyncDigest();
+  if (d !== _lastSyncDigest) {
+    _lastSyncDigest = d;
+    pushToGithub();
+  }
+}
 
 function togglePanel() {
   panelCollapsed = !panelCollapsed;
@@ -2300,8 +2283,8 @@ loadAll();
     }
   }
 })();
-// Auto-save on page close
-window.addEventListener('beforeunload', () => saveFullArticleData());
+// Auto-save + auto-sync on page close
+window.addEventListener('beforeunload', () => { saveFullArticleData(); syncOnClose(); });
 if (articleData) {
   renderAll();
 } else {
