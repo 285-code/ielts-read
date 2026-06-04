@@ -163,6 +163,16 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
 .data-controls { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap; }
 .data-controls button { font-size: 12px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: pointer; font-family: inherit; }
 .data-controls button:hover { background: #f0f0f0; }
+.sync-panel { display: none; margin-top: 12px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 12px; }
+.sync-panel.open { display: block; }
+.sync-panel label { font-weight: 700; display: block; margin-bottom: 4px; color: var(--text); }
+.sync-panel .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.sync-panel input[type="password"] { flex: 1; min-width: 160px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; font-family: inherit; }
+.sync-panel .status { color: var(--muted); font-size: 11px; }
+.sync-panel .status.ok { color: #2e7d32; }
+.sync-panel .status.err { color: #c62828; }
+.sync-panel .status.busy { color: #e65100; }
+.sync-toggle { font-size: 12px; cursor: pointer; color: var(--accent); text-decoration: underline; }
 
 /* Inline edit */
 .inline-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: Arial, sans-serif; outline: none; transition: border-color 0.15s; }
@@ -213,7 +223,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
   .modal-overlay, #inlineEdit, #pasteZone, .data-controls,
   .sentence-card, .phrase-bracket { display: none !important; }
   .left-panel { max-width: 100%; padding: 0; }
-  .article { font-size: 16px; line-height: 1.6; }
+  .article { font-size: 16px; line-height: 1.5; }
   .word-clickable { cursor: text; }
   .word-clickable.vocab-red, .word-clickable.vocab-yellow,
   .phrase-group.phrase-red, .phrase-group.phrase-yellow { background: none !important; border-bottom: none !important; }
@@ -413,6 +423,19 @@ body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: 
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJson(event)">
       <button onclick="if(confirm('Clear all data?')){clearAllData()}">🗑 Clear</button>
       <button onclick="copyVocabList()">📋 复制单词</button>
+      <span class="sync-toggle" onclick="toggleSyncPanel()">☁️ 同步设置</span>
+    </div>
+    <div class="sync-panel" id="syncPanel">
+      <div class="row">
+        <label>GitHub Token</label>
+        <input type="password" id="githubTokenInput" placeholder="ghp_xxxxxxxx" onchange="saveGithubToken()">
+      </div>
+      <div class="row">
+        <button onclick="pushToGithub()">⬆ 推送</button>
+        <button onclick="pullFromGithub()">⬇ 拉取</button>
+        <label style="font-weight:400;display:inline;margin:0;"><input type="checkbox" id="autoSyncCheck" onchange="toggleAutoSync()"> 自动同步</label>
+        <span class="status" id="syncStatus"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -1583,6 +1606,160 @@ function copyVocabList() {
 
 let panelCollapsed = false;
 
+/* ── GitHub Sync ── */
+const SYNC_OWNER = '285-code';
+const SYNC_REPO = 'ielts-read';
+const SYNC_PATH = 'data/sync.json';
+const SYNC_BRANCH = 'main';
+
+function getGithubToken() { return localStorage.getItem('ielts_github_token') || ''; }
+function saveGithubToken() {
+  const t = document.getElementById('githubTokenInput').value.trim();
+  localStorage.setItem('ielts_github_token', t);
+  setSyncStatus('token saved', 'ok');
+}
+function loadGithubToken() {
+  const t = getGithubToken();
+  const el = document.getElementById('githubTokenInput');
+  if (el) el.value = t;
+}
+
+function setSyncStatus(msg, cls) {
+  const el = document.getElementById('syncStatus');
+  if (el) { el.textContent = msg; el.className = 'status' + (cls ? ' ' + cls : ''); }
+}
+
+function toggleSyncPanel() {
+  const el = document.getElementById('syncPanel');
+  el.classList.toggle('open');
+  loadGithubToken();
+  const cb = document.getElementById('autoSyncCheck');
+  if (cb) cb.checked = localStorage.getItem('ielts_auto_sync') === '1';
+}
+
+function collectAllData() {
+  const index = JSON.parse(localStorage.getItem('ielts_index') || '{}');
+  const articles = {};
+  Object.keys(index).forEach(function(id) {
+    const raw = localStorage.getItem('ielts_article_' + id);
+    if (raw) articles[id] = JSON.parse(raw);
+  });
+  return { index: index, articles: articles, lastArticle: localStorage.getItem('ielts_last_article') || '' };
+}
+
+function pushToGithub() {
+  const token = getGithubToken();
+  if (!token) { setSyncStatus('set token first', 'err'); return; }
+  setSyncStatus('pushing...', 'busy');
+
+  const data = JSON.stringify(collectAllData());
+  const content = btoa(unescape(encodeURIComponent(data)));
+
+  // First get the current file SHA (if exists)
+  fetch('https://api.github.com/repos/' + SYNC_OWNER + '/' + SYNC_REPO + '/contents/' + SYNC_PATH + '?ref=' + SYNC_BRANCH, {
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' }
+  })
+  .then(function(r) {
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function(existing) {
+    var body = { message: 'sync: ' + new Date().toISOString().slice(0,16), content: content, branch: SYNC_BRANCH };
+    if (existing && existing.sha) body.sha = existing.sha;
+    return fetch('https://api.github.com/repos/' + SYNC_OWNER + '/' + SYNC_REPO + '/contents/' + SYNC_PATH, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' },
+      body: JSON.stringify(body)
+    });
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    setSyncStatus('synced ' + new Date().toLocaleTimeString(), 'ok');
+  })
+  .catch(function(e) {
+    setSyncStatus('push failed: ' + e.message, 'err');
+  });
+}
+
+function pullFromGithub() {
+  setSyncStatus('pulling...', 'busy');
+  fetch('https://raw.githubusercontent.com/' + SYNC_OWNER + '/' + SYNC_REPO + '/' + SYNC_BRANCH + '/' + SYNC_PATH)
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function(data) {
+    if (!data || !data.index) { throw new Error('invalid sync data'); }
+    mergeSyncData(data);
+    setSyncStatus('pulled ' + new Date().toLocaleTimeString(), 'ok');
+    location.reload();
+  })
+  .catch(function(e) {
+    setSyncStatus('pull failed: ' + e.message, 'err');
+  });
+}
+
+function mergeSyncData(data) {
+  // Merge index
+  var index = JSON.parse(localStorage.getItem('ielts_index') || '{}');
+  Object.keys(data.index).forEach(function(id) {
+    if (!index[id]) index[id] = data.index[id];
+  });
+  localStorage.setItem('ielts_index', JSON.stringify(index));
+  // Merge articles
+  Object.keys(data.articles).forEach(function(id) {
+    var key = 'ielts_article_' + id;
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, JSON.stringify(data.articles[id]));
+    }
+  });
+  if (data.lastArticle && !localStorage.getItem('ielts_last_article')) {
+    localStorage.setItem('ielts_last_article', data.lastArticle);
+  }
+}
+
+var _autoSyncTimer = null;
+var _lastSyncData = '';
+function getSyncDigest() {
+  var idx = localStorage.getItem('ielts_index') || '{}';
+  var last = localStorage.getItem('ielts_last_article') || '';
+  return idx.length + '|' + last;
+}
+
+function scheduleAutoSync() {
+  var cb = document.getElementById('autoSyncCheck');
+  if (!cb || !cb.checked) return;
+  if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
+  // Push every 5 min if data changed
+  _autoSyncTimer = setTimeout(function() {
+    var d = getSyncDigest();
+    if (d !== _lastSyncData) {
+      _lastSyncData = d;
+      pushToGithub();
+    }
+    scheduleAutoSync();  // schedule next check
+  }, 1800000);
+}
+
+function toggleAutoSync() {
+  var cb = document.getElementById('autoSyncCheck');
+  localStorage.setItem('ielts_auto_sync', cb.checked ? '1' : '0');
+  if (cb.checked) {
+    _lastSyncData = getSyncDigest();
+    scheduleAutoSync();
+  } else {
+    if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
+  }
+}
+
+// Wire auto-sync into save
+var _origSave = saveFullArticleData;
+saveFullArticleData = function() {
+  _origSave();
+  scheduleAutoSync();
+};
+
 function togglePanel() {
   panelCollapsed = !panelCollapsed;
   const panel = document.getElementById('rightPanel');
@@ -1696,12 +1873,14 @@ let reviewIndex = 0;
 let reviewStats = { correct: 0, incorrect: 0 };
 let reviewExpanded = false;
 let reviewRetry = false;
+let reviewRequeue = new Set(); // words that need re-review in this session
 
 function startReview() {
   reviewQueue = getReviewQueue();
   reviewIndex = 0;
   reviewStats = { correct: 0, incorrect: 0 };
   reviewRetry = false;
+  reviewRequeue = new Set();
   showReviewCard();
 }
 
@@ -1720,6 +1899,26 @@ function showReviewCard() {
   }
 
   if (reviewIndex >= reviewQueue.length) {
+    if (reviewRequeue.size > 0) {
+      var newQ = [];
+      var seen = new Set();
+      vocabData.forEach(function(v) {
+        if (reviewRequeue.has(v.wordLower) && !v.suspended) {
+          var k = v.wordLower + '|' + v.sentenceId;
+          if (!seen.has(k)) { seen.add(k); newQ.push(Object.assign({}, v)); }
+        }
+      });
+      if (newQ.length > 0) {
+        for (var i = newQ.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var tmp = newQ[i]; newQ[i] = newQ[j]; newQ[j] = tmp;
+        }
+        reviewQueue = newQ;
+        reviewIndex = 0;
+        showReviewCard();
+        return;
+      }
+    }
     const total = reviewStats.correct + reviewStats.incorrect;
     labelEl.textContent = `Done! ${reviewStats.correct}/${total}`;
     barFill.style.width = '100%';
@@ -1918,6 +2117,7 @@ function checkAnswer() {
       input.disabled = true;
       setTimeout(function(){ speakWord(entry.word); }, 100);
     } else {
+      reviewRequeue.delete(entry.wordLower);
       updateStage(entry, true);
       reviewStats.correct++;
       feedback.innerHTML = '<span class="review-correct">✓ Correct! Stage ' + (entry.stage - 1) + ' → ' + entry.stage + ' (next in ' + SRS_INTERVALS[entry.stage] + 'd)</span>' +
@@ -1934,6 +2134,7 @@ function checkAnswer() {
   } else {
     if (!reviewRetry) {
       // First wrong attempt — decrease stage, show answer, start retry
+      reviewRequeue.add(entry.wordLower);
       updateStage(entry, false);
       reviewStats.incorrect++;
       reviewRetry = true;
