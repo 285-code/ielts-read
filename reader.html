@@ -1698,7 +1698,7 @@ function pullFromGithub() {
       // API returns base64-encoded content
       return r.json().then(function(j) {
         if (!j || !j.content) throw new Error('invalid response');
-        return JSON.parse(decodeURIComponent(escape(atob(j.content))));
+        return JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\s/g,'')))));
       });
     } else {
       return r.json();
@@ -2322,7 +2322,7 @@ setTimeout(function() {
       })
       .then(function(j) {
         if (!j || !j.content) return;
-        var data = JSON.parse(decodeURIComponent(escape(atob(j.content))));
+        var data = JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\s/g,'')))));
         if (data && data.index) { mergeSyncData(data); location.reload(); }
       })
       .catch(function() {});
