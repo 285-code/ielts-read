@@ -1647,7 +1647,8 @@ function collectAllData() {
   return { index: index, articles: articles, lastArticle: localStorage.getItem('ielts_last_article') || '' };
 }
 
-function pushToGithub() {
+function pushToGithub(retries) {
+  if (retries === undefined) retries = 3;
   const token = getGithubToken();
   if (!token) { setSyncStatus('set token first', 'err'); return; }
   setSyncStatus('pushing...', 'busy');
@@ -1674,6 +1675,10 @@ function pushToGithub() {
     });
   })
   .then(function(r) {
+    if (r.status === 409 && retries > 0) {
+      // SHA conflict — retry with fresh SHA
+      return pushToGithub(retries - 1);
+    }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     setSyncStatus('synced ' + new Date().toLocaleTimeString(), 'ok');
   })
@@ -2190,7 +2195,10 @@ function showDashboard() {
   const store = getArticleIndex();
   const ids = Object.keys(store).sort();
 
-  let html = '<div class="dash-header"><h1>📚 我的精读</h1><button class="btn-primary" onclick="showPasteZone()">+ 新文章</button></div>';
+  const trashCount = (JSON.parse(localStorage.getItem('ielts_trash') || '[]')).length;
+  let html = '<div class="dash-header"><h1>📚 我的精读</h1><div style="display:flex;gap:8px;align-items:center;">' +
+    (trashCount ? '<span style="font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;" onclick="showTrash()">🗑 回收站 (' + trashCount + ')</span>' : '') +
+    '<button class="btn-primary" onclick="showPasteZone()">+ 新文章</button></div></div>';
 
   if (!ids.length) {
     html += '<div class="empty-state"><p>还没有文章，点击上方按钮开始。</p></div>';
@@ -2229,9 +2237,18 @@ function openArticle(id) {
 }
 
 function deleteArticle(id) {
-  if (!confirm('Delete "' + (getArticleIndex()[id]?.title || id) + '" and all its data?')) return;
-  localStorage.removeItem(getArticleStoreKey(id));
   const store = getArticleIndex();
+  const info = store[id];
+  const title = info?.title || id;
+  if (!confirm('Delete "' + title + '" and all its data?')) return;
+
+  // Move to trash
+  const raw = localStorage.getItem(getArticleStoreKey(id));
+  const trash = JSON.parse(localStorage.getItem('ielts_trash') || '[]');
+  trash.push({ id, title, source: info?.source || '', deletedAt: new Date().toISOString().slice(0,10), data: raw ? JSON.parse(raw) : null });
+  localStorage.setItem('ielts_trash', JSON.stringify(trash));
+
+  localStorage.removeItem(getArticleStoreKey(id));
   delete store[id];
   saveArticleIndex(store);
   if (!Object.keys(store).length) localStorage.removeItem('ielts_last_article');
@@ -2240,6 +2257,51 @@ function deleteArticle(id) {
     vocabData = []; sentenceData = []; syntaxData = []; sentenceNotes = {};
   }
   showDashboard();
+}
+
+function showTrash() {
+  const trash = JSON.parse(localStorage.getItem('ielts_trash') || '[]');
+  const dash = document.getElementById('dashboard');
+  let html = '<div class="dash-header"><h1>🗑 回收站</h1><button class="btn-primary" onclick="showDashboard()">← 返回</button></div>';
+  if (!trash.length) {
+    html += '<div class="empty-state"><p>回收站为空</p></div>';
+  } else {
+    html += '<div class="dash-grid">';
+    trash.forEach(function(item, i) {
+      html += '<div class="dash-card">' +
+        '<div class="dash-source">' + escHtml(item.source) + ' · ' + item.deletedAt + '</div>' +
+        '<div class="dash-title">' + escHtml(item.title) + '</div>' +
+        '<div class="dash-meta" style="margin-top:8px;display:flex;gap:8px;">' +
+        '  <button class="btn-primary" style="font-size:12px;padding:4px 12px;" onclick="restoreArticle(' + i + ')">↩ 恢复</button>' +
+        '  <button style="font-size:12px;padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;" onclick="permaDelete(' + i + ')">🗑 永久删除</button>' +
+        '</div></div>';
+    });
+    html += '</div>';
+  }
+  dash.innerHTML = html;
+}
+
+function restoreArticle(index) {
+  const trash = JSON.parse(localStorage.getItem('ielts_trash') || '[]');
+  const item = trash[index];
+  if (!item) return;
+  trash.splice(index, 1);
+  localStorage.setItem('ielts_trash', JSON.stringify(trash));
+  if (item.data) {
+    localStorage.setItem(getArticleStoreKey(item.id), JSON.stringify(item.data));
+    const store = getArticleIndex();
+    store[item.id] = { id: item.id, title: item.title, source: item.source, created: item.data.article?.date || item.deletedAt, modified: item.deletedAt, vocabCount: (item.data.vocab || []).length, sentCount: (item.data.sentences || []).length };
+    saveArticleIndex(store);
+  }
+  showTrash();
+}
+
+function permaDelete(index) {
+  if (!confirm('永久删除这篇文章？不可恢复。')) return;
+  const trash = JSON.parse(localStorage.getItem('ielts_trash') || '[]');
+  trash.splice(index, 1);
+  localStorage.setItem('ielts_trash', JSON.stringify(trash));
+  showTrash();
 }
 
 // ============================================================
