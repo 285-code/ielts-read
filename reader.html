@@ -1175,7 +1175,7 @@ function markWord(level) {
   if (currentSyntaxSelection && currentSyntaxSelection.indices.length >= 2) {
     const { sentId, indices, wordSpans } = currentSyntaxSelection;
     const phraseText = wordSpans.map(s => s.dataset.word).join(' ');
-    const phraseLower = indices.map(i => wordSpans.find(s => parseInt(s.dataset.w) === i)?.dataset.clean || '').join('');
+    const phraseLower = indices.map(i => wordSpans.find(s => parseInt(s.dataset.w) === i)?.dataset.clean || '').join(' ');
     const sentText = wordSpans[0]?.closest('.sentence')?.textContent || '';
     const existing = vocabData.find(v => v.wordIndices && v.wordIndices.length === indices.length && v.sentenceId === sentId && v.wordIndices.every(i => indices.includes(i)));
     vocabData = vocabData.filter(v => !(v.wordIndices && v.wordIndices.length === indices.length && v.sentenceId === sentId && v.wordIndices.every(i => indices.includes(i))));
@@ -2283,6 +2283,12 @@ loadAll();
     }
   }
 })();
+// Fix phrase wordLower that lost spaces
+vocabData.forEach(function(v) {
+  if (v.wordIndices && v.word && v.wordLower && v.word.indexOf(' ') !== -1 && v.wordLower.indexOf(' ') === -1) {
+    v.wordLower = v.word.toLowerCase();
+  }
+});
 // Auto-save + auto-sync on page close
 window.addEventListener('beforeunload', () => { saveFullArticleData(); syncOnClose(); });
 if (articleData) {
