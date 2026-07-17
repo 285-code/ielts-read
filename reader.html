@@ -1662,7 +1662,15 @@ function collectAllData() {
     const raw = localStorage.getItem('ielts_article_' + id);
     if (raw) articles[id] = JSON.parse(raw);
   });
-  return { index: index, articles: articles, lastArticle: localStorage.getItem('ielts_last_article') || '' };
+  return {
+    index: index,
+    articles: articles,
+    lastArticle: localStorage.getItem('ielts_last_article') || '',
+    vocab: JSON.parse(localStorage.getItem('ielts_vocab') || '[]'),
+    syntax: JSON.parse(localStorage.getItem('ielts_syntax') || '[]'),
+    sentences: JSON.parse(localStorage.getItem('ielts_sentences') || '[]'),
+    sentenceNotes: JSON.parse(localStorage.getItem('ielts_sentence_notes') || '{}')
+  };
 }
 
 function pushToGithub(retries) {
@@ -1753,13 +1761,59 @@ function mergeSyncData(data) {
   if (data.lastArticle) {
     localStorage.setItem('ielts_last_article', data.lastArticle);
   }
+  // Merge vocab
+  if (data.vocab) {
+    var localVocab = JSON.parse(localStorage.getItem('ielts_vocab') || '[]');
+    var existingKeys = {};
+    localVocab.forEach(function(v) { existingKeys[v.wordLower + '|' + (v.sentenceId || '')] = true; });
+    data.vocab.forEach(function(v) {
+      var key = v.wordLower + '|' + (v.sentenceId || '');
+      if (!existingKeys[key]) { localVocab.push(v); existingKeys[key] = true; }
+    });
+    localStorage.setItem('ielts_vocab', JSON.stringify(localVocab));
+  }
+  // Merge syntax
+  if (data.syntax) {
+    var localSyntax = JSON.parse(localStorage.getItem('ielts_syntax') || '[]');
+    var synKeys = {};
+    localSyntax.forEach(function(s) { synKeys[s.sentId + '|' + s.wordIndices.join(',') + '|' + s.type] = true; });
+    data.syntax.forEach(function(s) {
+      var key = s.sentId + '|' + s.wordIndices.join(',') + '|' + s.type;
+      if (!synKeys[key]) { localSyntax.push(s); synKeys[key] = true; }
+    });
+    localStorage.setItem('ielts_syntax', JSON.stringify(localSyntax));
+  }
+  // Merge sentence collections
+  if (data.sentences) {
+    var localSents = JSON.parse(localStorage.getItem('ielts_sentences') || '[]');
+    var sentKeys = {};
+    localSents.forEach(function(s) { sentKeys[s.sentId] = true; });
+    data.sentences.forEach(function(s) {
+      if (!sentKeys[s.sentId]) { localSents.push(s); sentKeys[s.sentId] = true; }
+    });
+    localStorage.setItem('ielts_sentences', JSON.stringify(localSents));
+  }
+  // Merge sentence notes
+  if (data.sentenceNotes) {
+    var localNotes = JSON.parse(localStorage.getItem('ielts_sentence_notes') || '{}');
+    Object.keys(data.sentenceNotes).forEach(function(id) {
+      if (!localNotes[id]) localNotes[id] = data.sentenceNotes[id];
+    });
+    localStorage.setItem('ielts_sentence_notes', JSON.stringify(localNotes));
+  }
 }
 
 var _lastSyncDigest = '';
 function getSyncDigest() {
-  var idx = localStorage.getItem('ielts_index') || '{}';
-  var last = localStorage.getItem('ielts_last_article') || '';
-  return idx.length + '|' + last;
+  var parts = [
+    localStorage.getItem('ielts_index') || '{}',
+    localStorage.getItem('ielts_last_article') || '',
+    localStorage.getItem('ielts_vocab') || '[]',
+    localStorage.getItem('ielts_syntax') || '[]',
+    localStorage.getItem('ielts_sentences') || '[]',
+    localStorage.getItem('ielts_sentence_notes') || '{}'
+  ];
+  return parts.map(function(p) { return p.length; }).join('|');
 }
 
 function toggleAutoSync() {
